@@ -2928,7 +2928,7 @@ function App() {
                         <div style={{ fontSize: '0.875rem' }}>Querying active web stack...</div>
                       ) : (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                          {webstackInfo?.engines.map((eng: any) => (
+                          {webstackInfo?.engines?.map((eng: any) => (
                             <div 
                               key={eng.name}
                               style={{
