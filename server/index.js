@@ -1272,7 +1272,7 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
-
+  try {
     // Serve Site Preview Route (allows previewing websites before DNS resolves)
     if (pathname.startsWith('/preview/') && req.method === 'GET') {
       const parts = pathname.substring(9).split('/');
