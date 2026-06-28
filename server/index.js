@@ -4581,3 +4581,59 @@ setInterval(() => {
 server.listen(PORT, () => {
   console.log(`Keel Panel Backend running on http://localhost:${PORT}`);
 });
+
+// Start Webmail Static Server on port 3002
+const webmailServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = url.pathname;
+  
+  // Serve static files from webmail/dist
+  const webmailDistPath = path.join(WORKSPACE_ROOT, 'webmail', 'dist');
+  let filePath = path.join(webmailDistPath, pathname);
+  
+  let stats;
+  try {
+    stats = await fs.stat(filePath);
+    if (stats.isDirectory()) {
+      filePath = path.join(webmailDistPath, 'index.html');
+    }
+  } catch (err) {
+    filePath = path.join(webmailDistPath, 'index.html');
+  }
+
+  try {
+    const fileContent = await fs.readFile(filePath);
+    let contentType = 'text/plain';
+    if (filePath.endsWith('.html')) contentType = 'text/html';
+    else if (filePath.endsWith('.css')) contentType = 'text/css';
+    else if (filePath.endsWith('.js')) contentType = 'application/javascript';
+    else if (filePath.endsWith('.png')) contentType = 'image/png';
+    else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) contentType = 'image/jpeg';
+    else if (filePath.endsWith('.svg')) contentType = 'image/svg+xml';
+    else if (filePath.endsWith('.ico')) contentType = 'image/x-icon';
+
+    res.writeHead(200, { 'Content-Type': contentType });
+    res.end(fileContent);
+  } catch (err) {
+    // Development fallback (serve webmail/index.html source if no build exists)
+    if (pathname === '/' || pathname === '/index.html') {
+      const srcIndex = path.join(WORKSPACE_ROOT, 'webmail', 'index.html');
+      try {
+        const html = await fs.readFile(srcIndex, 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(html);
+        return;
+      } catch (e) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Webmail build files not found. Run npm run build in the webmail directory.');
+        return;
+      }
+    }
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('File not found');
+  }
+});
+
+webmailServer.listen(3002, () => {
+  console.log(`Webmail Client running on http://localhost:3002`);
+});
