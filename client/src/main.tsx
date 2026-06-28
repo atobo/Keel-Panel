@@ -4009,7 +4009,7 @@ function App() {
                                         className="btn btn-secondary btn-small" 
                                         style={{ marginRight: '8px', padding: '4px 8px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                         onClick={() => {
-                                          window.open(`http://localhost:3002?email=${encodeURIComponent(mail.email)}&token=${encodeURIComponent(token)}`, '_blank');
+                                          window.open(`http://${window.location.hostname}:3002?email=${encodeURIComponent(mail.email)}&token=${encodeURIComponent(token)}`, '_blank');
                                         }}
                                       >
                                         <Mail size={12} />
