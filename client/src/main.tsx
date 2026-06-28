@@ -38,7 +38,8 @@ import {
   Package,
   Container,
   Sparkles,
-  Users
+  Users,
+  ExternalLink
 } from 'lucide-react';
 import './style.css';
 import logoIcon from './assets/logo-icon.png';
@@ -3314,6 +3315,9 @@ function App() {
                                 </td>
                                 <td>
                                   <div style={{ display: 'flex', gap: '8px' }}>
+                                    <a href={`http://${dom.name}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-small" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+                                      <ExternalLink size={12} /> Visit
+                                    </a>
                                     <button className="btn btn-secondary btn-small" onClick={() => setSelectedDomainDns(dom)}>
                                       DNS Records
                                     </button>
