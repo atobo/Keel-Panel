@@ -2111,11 +2111,21 @@ function App() {
     if (!filesToUpload || filesToUpload.length === 0) return;
     
     setIsUploadModalOpen(true);
-    const newUploading = Array.from(filesToUpload).map(f => ({ name: f.name, status: 'pending', progress: 0 }));
+    const newUploading = Array.from(filesToUpload).map(f => {
+      const isDirectory = f.size === 0 && !f.type && !f.name.includes('.');
+      return {
+        name: f.name,
+        status: isDirectory ? 'folder_error' : 'pending',
+        progress: 0
+      };
+    });
     setUploadingFiles(newUploading);
 
     for (let i = 0; i < filesToUpload.length; i++) {
       const file = filesToUpload[i];
+      const isDirectory = file.size === 0 && !file.type && !file.name.includes('.');
+      if (isDirectory) continue;
+
       setUploadingFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
       
       try {
@@ -2147,15 +2157,44 @@ function App() {
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    const filesToUpload = e.dataTransfer.files;
-    if (!filesToUpload || filesToUpload.length === 0) return;
+    const items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
     
     setIsUploadModalOpen(true);
-    const newUploading = Array.from(filesToUpload).map(f => ({ name: f.name, status: 'pending', progress: 0 }));
-    setUploadingFiles(newUploading);
+    const uploadsList: any[] = [];
+    const filesToUpload: any[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry();
+        if (entry) {
+          if (entry.isDirectory) {
+            uploadsList.push({ name: entry.name, status: 'folder_error', progress: 0 });
+            filesToUpload.push(null);
+          } else {
+            const file = item.getAsFile();
+            if (file) {
+              uploadsList.push({ name: file.name, status: 'pending', progress: 0 });
+              filesToUpload.push(file);
+            }
+          }
+        } else {
+          const file = item.getAsFile();
+          if (file) {
+            uploadsList.push({ name: file.name, status: 'pending', progress: 0 });
+            filesToUpload.push(file);
+          }
+        }
+      }
+    }
+    
+    setUploadingFiles(uploadsList);
 
     for (let i = 0; i < filesToUpload.length; i++) {
       const file = filesToUpload[i];
+      if (!file) continue;
+      
       setUploadingFiles(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
       
       try {
@@ -6815,11 +6854,11 @@ function App() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
                       <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>{up.name}</span>
                       <span style={{ 
-                        color: up.status === 'success' ? 'var(--success)' : up.status === 'error' ? 'var(--danger)' : 'var(--accent-blue)',
+                        color: up.status === 'success' ? 'var(--success)' : (up.status === 'error' || up.status === 'folder_error') ? 'var(--danger)' : 'var(--accent-blue)',
                         fontWeight: 600,
                         fontSize: '0.8rem'
                       }}>
-                        {up.status.toUpperCase()}
+                        {up.status === 'folder_error' ? 'FOLDER (USE ZIP)' : up.status.toUpperCase()}
                       </span>
                     </div>
                     {up.status === 'uploading' && (
