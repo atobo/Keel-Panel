@@ -76,6 +76,7 @@ initPgDatabase();
 
 // Define directories
 const WORKSPACE_ROOT = path.resolve(__dirname, '..');
+const IS_DEMO = process.env.DEMO_MODE === 'true';
 const SANDBOX_DIR = path.join(WORKSPACE_ROOT, 'sandbox');
 const VHOSTS_MOCK_DIR = path.join(WORKSPACE_ROOT, 'server', 'vhosts');
 const SSL_MOCK_DIR = path.join(WORKSPACE_ROOT, 'server', 'ssl');
@@ -139,13 +140,16 @@ const FTP_SSH_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'ftp_ssh_config.
 
 async function initFtpSshConfig() {
   if (!existsSync(FTP_SSH_CONFIG_FILE)) {
-    const initialConfig = {
+    const initialConfig = IS_DEMO ? {
       ftpUsers: [
         { username: 'ftp_user1', path: '/sandbox', quota: '1 GB', status: 'active', owner: 'tenant1' }
       ],
       sshKeys: [
         { name: 'Craig Laptop', keyType: 'ssh-rsa', fingerprint: 'SHA256:q9k8d/uP3h9xPzK2mSdf038df...', owner: 'tenant1' }
       ]
+    } : {
+      ftpUsers: [],
+      sshKeys: []
     };
     try {
       await fs.writeFile(FTP_SSH_CONFIG_FILE, JSON.stringify(initialConfig, null, 2), 'utf-8');
@@ -160,7 +164,7 @@ const EMAILS_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'emails_config.js
 
 async function initEmailsConfig() {
   if (!existsSync(EMAILS_CONFIG_FILE)) {
-    const initialConfig = {
+    const initialConfig = IS_DEMO ? {
       emails: [
         { email: 'admin@keel-wp.test', quota: '500 MB', used: '24.1 MB', owner: 'tenant1' },
         { email: 'info@keel-wp.test', quota: '250 MB', used: '0.0 MB', owner: 'tenant1' }
@@ -171,6 +175,15 @@ async function initEmailsConfig() {
       autoresponders: [
         { email: 'info@keel-wp.test', subject: 'Out of Office Auto-Reply', message: 'Hello, thank you for your email. I am currently out of the office and will respond when I return.', enabled: true, owner: 'tenant1' }
       ],
+      spamFilter: {
+        enabled: false,
+        scoreThreshold: 5.0,
+        autoDelete: false
+      }
+    } : {
+      emails: [],
+      emailForwarders: [],
+      autoresponders: [],
       spamFilter: {
         enabled: false,
         scoreThreshold: 5.0,
@@ -288,7 +301,7 @@ const DX_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'dx_config.json');
 async function loadDxConfig() {
   try {
     if (!existsSync(DX_CONFIG_FILE)) {
-      const initialConfig = {
+      const initialConfig = IS_DEMO ? {
         gitDeployments: [
           {
             id: 'proj_sample',
@@ -334,6 +347,10 @@ async function loadDxConfig() {
             uptime: '3d 4h'
           }
         ]
+      } : {
+        gitDeployments: [],
+        registeredApps: [],
+        launchedContainers: []
       };
       await fs.writeFile(DX_CONFIG_FILE, JSON.stringify(initialConfig, null, 2), 'utf-8');
       return initialConfig;
@@ -816,19 +833,19 @@ ensureSandbox();
 const PORT = 3001;
 
 // Simple hardcoded database state for demo mode
-let databases = [
+let databases = IS_DEMO ? [
   { name: 'keel_wp', type: 'mysql', size: '24.5 MB', tables: 12, users: ['wp_user'], owner: 'tenant1' },
   { name: 'app_production', type: 'postgresql', size: '142.1 MB', tables: 45, users: ['app_admin', 'app_reader'], owner: 'tenant1' },
   { name: 'test_db', type: 'mysql', size: '0.1 MB', tables: 0, users: [], owner: 'tenant1' }
-];
+] : [];
 
-let dbUsers = [
+let dbUsers = IS_DEMO ? [
   { username: 'wp_user', hosts: ['localhost'], owner: 'tenant1' },
   { username: 'app_admin', hosts: ['localhost', '10.0.0.5'], owner: 'tenant1' },
   { username: 'app_reader', hosts: ['localhost'], owner: 'tenant1' }
-];
+] : [];
 
-let dbData = {
+let dbData = IS_DEMO ? {
   'keel_wp': {
     'wp_users': {
       columns: ['id', 'username', 'email', 'role', 'created_at'],
@@ -868,14 +885,16 @@ let dbData = {
     }
   },
   'test_db': {}
-};
+} : {};
 
 let protectedDirectories = {};
 
 // Authentication configurations & User database
-let users = [
+let users = IS_DEMO ? [
   { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' },
   { username: 'tenant1', password: process.env.TENANT_PASSWORD || 'password', role: 'tenant', quota: '5 GB', created: '2026-06-25' }
+] : [
+  { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' }
 ];
 let activeSessions = new Map(); // token -> username
 
@@ -887,7 +906,7 @@ let webServer = {
   uptime: 86400 * 4 + 3600 * 2 // 4 days, 2 hours
 };
 
-let domains = [
+let domains = IS_DEMO ? [
   {
     name: 'keel-wp.test',
     docroot: '/sandbox',
@@ -917,29 +936,29 @@ let domains = [
       { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 }
     ]
   }
-];
+] : [];
 
 // Mock states for new modules
 let emails = [];
 let emailForwarders = [];
 let autoresponders = [];
 let spamFilter = { enabled: false, scoreThreshold: 5.0, autoDelete: false };
-let webmailMessages = [
+let webmailMessages = IS_DEMO ? [
   { id: '1', from: 'Keel Panel Core Team', to: 'admin@keel-wp.test', subject: 'Welcome to your Keel Panel Mail Server', body: 'Hello! Your SMTP/IMAP servers are now active. You can manage your mail server, add accounts, and forwarders directly from the dashboard.', date: '2026-06-25 09:00', read: false },
   { id: '2', from: 'Let\'s Encrypt Certificate Authority', to: 'admin@keel-wp.test', subject: 'SSL Certificate Auto-Renewal Notice', body: 'This is an automated notice that your SSL certificate for keel-wp.test has been successfully renewed and applied to the mail server configuration.', date: '2026-06-26 06:15', read: true }
-];
+] : [];
 
-let webmailContacts = [
+let webmailContacts = IS_DEMO ? [
   { id: '1', name: 'Alice Smith', email: 'alice@keel-wp.test', groups: ['Team', 'Clients'] },
   { id: '2', name: 'Bob Johnson', email: 'bob@keel-wp.test', groups: ['Team'] },
   { id: '3', name: 'Charlie Brown', email: 'charlie@gmail.com', groups: ['Clients'] }
-];
+] : [];
 
-let webmailGroups = [
+let webmailGroups = IS_DEMO ? [
   { name: 'Team', color: '#14b8a6' },
   { name: 'Clients', color: '#3b82f6' },
   { name: 'Partners', color: '#8b5cf6' }
-];
+] : [];
 
 async function loadEmailsData() {
   const config = await loadEmailsConfig();
@@ -949,27 +968,27 @@ async function loadEmailsData() {
   spamFilter = config.spamFilter || { enabled: false, scoreThreshold: 5.0, autoDelete: false };
 }
 loadEmailsData();
-let certificates = [
+let certificates = IS_DEMO ? [
   { domain: 'keel-wp.test', issuer: "Let's Encrypt", expiry: '2026-09-23', status: 'valid', owner: 'tenant1' },
   { domain: 'production-app.test', issuer: 'Self-Signed', expiry: '2027-06-25', status: 'valid', owner: 'tenant1' }
-];
-let ftpUsers = [
+] : [];
+let ftpUsers = IS_DEMO ? [
   { username: 'ftp_user1', path: '/sandbox', quota: '1 GB', status: 'active', owner: 'tenant1' }
-];
-let sshKeys = [
+] : [];
+let sshKeys = IS_DEMO ? [
   { name: 'Craig Laptop', keyType: 'ssh-rsa', fingerprint: 'SHA256:q9k8d/uP3h9xPzK2mSdf038df...', owner: 'tenant1' }
-];
-let crons = [
+] : [];
+let crons = IS_DEMO ? [
   { id: '1', schedule: '0 0 * * *', command: 'tar -czf /backups/site.tar.gz /sandbox', description: 'Daily backup script', owner: 'tenant1' }
-];
-let backups = [
+] : [];
+let backups = IS_DEMO ? [
   { filename: 'backup_2026-06-20.tar.gz', date: '2026-06-20', size: '14.2 MB', owner: 'tenant1' }
-];
+] : [];
 
-let blockedIps = [
+let blockedIps = IS_DEMO ? [
   { ip: '198.51.100.42', reason: 'Abusive requests to login endpoint', date: '2026-06-25', owner: 'tenant1' },
   { ip: '203.0.113.0/24', reason: 'Blocked subnet range', date: '2026-06-26', owner: 'tenant1' }
-];
+] : [];
 let firewallStatus = 'active';
 let firewallRules = [
   { index: 1, to: '22/tcp', action: 'ALLOW', from: 'Anywhere', comment: 'SSH port' },
