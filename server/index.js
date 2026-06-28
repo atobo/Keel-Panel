@@ -587,33 +587,49 @@ async function generateVHost(domain, docroot, engine = 'nginx', phpVersion = '8.
     : getApacheTemplate(domain, docroot, phpVersion, sslConfig, redirectUrl, hotlinkProtect) + '\n\n' + getApacheWebmailTemplate(domain, sslConfig);
 
   if (isLinux) {
-    const configPath = engine === 'nginx'
-      ? `/etc/nginx/sites-available/${domain}.conf`
-      : `/etc/apache2/sites-available/${domain}.conf`;
-    const enabledPath = engine === 'nginx'
-      ? `/etc/nginx/sites-enabled/${domain}.conf`
-      : `/etc/apache2/sites-enabled/${domain}.conf`;
+    const hasNginx = existsSync('/etc/nginx');
+    const hasApache = existsSync('/etc/apache2');
+    const targetEngineExists = (engine === 'nginx' && hasNginx) || (engine === 'apache' && hasApache);
 
-    try {
-      const tempPath = path.join(os.tmpdir(), `${domain}.conf`);
-      await fs.writeFile(tempPath, configContent, 'utf-8');
-      
-      await runCommandAsync(`sudo cp "${tempPath}" "${configPath}"`);
-      await fs.unlink(tempPath);
+    if (targetEngineExists) {
+      const configPath = engine === 'nginx'
+        ? `/etc/nginx/sites-available/${domain}.conf`
+        : `/etc/apache2/sites-available/${domain}.conf`;
+      const enabledPath = engine === 'nginx'
+        ? `/etc/nginx/sites-enabled/${domain}.conf`
+        : `/etc/apache2/sites-enabled/${domain}.conf`;
 
-      if (engine === 'nginx') {
-        await runCommandAsync(`sudo ln -sf "${configPath}" "${enabledPath}"`);
-        await runCommandAsync(`sudo nginx -t`);
-        await runCommandAsync(`sudo systemctl reload nginx`);
-      } else {
-        await runCommandAsync(`sudo a2ensite ${domain}`);
-        await runCommandAsync(`sudo apache2ctl configtest`);
-        await runCommandAsync(`sudo systemctl reload apache2`);
+      try {
+        const tempPath = path.join(os.tmpdir(), `${domain}.conf`);
+        await fs.writeFile(tempPath, configContent, 'utf-8');
+        
+        await runCommandAsync(`sudo cp "${tempPath}" "${configPath}"`);
+        await fs.unlink(tempPath);
+
+        if (engine === 'nginx') {
+          await runCommandAsync(`sudo ln -sf "${configPath}" "${enabledPath}"`);
+          await runCommandAsync(`sudo nginx -t`);
+          await runCommandAsync(`sudo systemctl reload nginx`);
+        } else {
+          await runCommandAsync(`sudo a2ensite ${domain}`);
+          await runCommandAsync(`sudo apache2ctl configtest`);
+          await runCommandAsync(`sudo systemctl reload apache2`);
+        }
+        console.log(`Successfully generated and loaded real vHost config for ${domain} on Nginx/Apache (SSL: ${!!sslConfig}, Redirect: ${!!redirectUrl})`);
+      } catch (err) {
+        console.error(`Production vHost generation failed for ${domain}:`, err.message);
+        throw err;
       }
-      console.log(`Successfully generated and loaded real vHost config for ${domain} on Nginx/Apache (SSL: ${!!sslConfig}, Redirect: ${!!redirectUrl})`);
-    } catch (err) {
-      console.error(`Production vHost generation failed for ${domain}:`, err.message);
-      throw err;
+    } else {
+      console.log(`[Web Server Not Detected] Target web engine '${engine}' is not installed on this host. Saving domain configuration locally.`);
+      const configPath = path.join(VHOSTS_MOCK_DIR, `${domain}.conf`);
+      try {
+        await fs.writeFile(configPath, configContent, 'utf-8');
+        console.log(`Successfully saved domain configuration locally at: ${configPath}`);
+      } catch (err) {
+        console.error(`Failed to save fallback domain configuration for ${domain}:`, err.message);
+        throw err;
+      }
     }
   } else {
     const configPath = path.join(VHOSTS_MOCK_DIR, `${domain}.conf`);
@@ -630,26 +646,43 @@ async function generateVHost(domain, docroot, engine = 'nginx', phpVersion = '8.
 async function removeVHost(domain, engine = 'nginx') {
   const isLinux = process.platform === 'linux';
   if (isLinux) {
-    const configPath = engine === 'nginx'
-      ? `/etc/nginx/sites-available/${domain}.conf`
-      : `/etc/apache2/sites-available/${domain}.conf`;
-    const enabledPath = engine === 'nginx'
-      ? `/etc/nginx/sites-enabled/${domain}.conf`
-      : `/etc/apache2/sites-enabled/${domain}.conf`;
+    const hasNginx = existsSync('/etc/nginx');
+    const hasApache = existsSync('/etc/apache2');
+    const targetEngineExists = (engine === 'nginx' && hasNginx) || (engine === 'apache' && hasApache);
 
-    try {
-      if (engine === 'nginx') {
-        await runCommandAsync(`sudo rm -f "${enabledPath}"`);
-        await runCommandAsync(`sudo rm -f "${configPath}"`);
-        await runCommandAsync(`sudo systemctl reload nginx`);
-      } else {
-        await runCommandAsync(`sudo a2dissite ${domain}`);
-        await runCommandAsync(`sudo rm -f "${configPath}"`);
-        await runCommandAsync(`sudo systemctl reload apache2`);
+    if (targetEngineExists) {
+      const configPath = engine === 'nginx'
+        ? `/etc/nginx/sites-available/${domain}.conf`
+        : `/etc/apache2/sites-available/${domain}.conf`;
+      const enabledPath = engine === 'nginx'
+        ? `/etc/nginx/sites-enabled/${domain}.conf`
+        : `/etc/apache2/sites-enabled/${domain}.conf`;
+
+      try {
+        if (engine === 'nginx') {
+          await runCommandAsync(`sudo rm -f "${enabledPath}"`);
+          await runCommandAsync(`sudo rm -f "${configPath}"`);
+          await runCommandAsync(`sudo systemctl reload nginx`);
+        } else {
+          await runCommandAsync(`sudo a2dissite ${domain}`);
+          await runCommandAsync(`sudo rm -f "${configPath}"`);
+          await runCommandAsync(`sudo systemctl reload apache2`);
+        }
+        console.log(`Successfully removed real vHost config for ${domain}`);
+      } catch (err) {
+        console.error(`Production vHost removal failed for ${domain}:`, err.message);
       }
-      console.log(`Successfully removed real vHost config for ${domain}`);
-    } catch (err) {
-      console.error(`Production vHost removal failed for ${domain}:`, err.message);
+    } else {
+      console.log(`[Web Server Not Detected] Target web engine '${engine}' is not installed on this host. Removing domain configuration locally.`);
+      const configPath = path.join(VHOSTS_MOCK_DIR, `${domain}.conf`);
+      try {
+        if (existsSync(configPath)) {
+          await fs.unlink(configPath);
+        }
+        console.log(`Successfully removed fallback domain configuration for ${domain}`);
+      } catch (err) {
+        // Ignore
+      }
     }
   } else {
     const configPath = path.join(VHOSTS_MOCK_DIR, `${domain}.conf`);
