@@ -3318,6 +3318,9 @@ function App() {
                                     <a href={`http://${dom.name}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-small" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
                                       <ExternalLink size={12} /> Visit
                                     </a>
+                                    <a href={`${window.location.protocol}//${window.location.hostname}:3001/preview/${dom.name}`} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-small" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}>
+                                      <Globe size={12} /> Preview
+                                    </a>
                                     <button className="btn btn-secondary btn-small" onClick={() => setSelectedDomainDns(dom)}>
                                       DNS Records
                                     </button>

@@ -1273,7 +1273,89 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname;
 
-  try {
+    // Serve Site Preview Route (allows previewing websites before DNS resolves)
+    if (pathname.startsWith('/preview/') && req.method === 'GET') {
+      const parts = pathname.substring(9).split('/');
+      const domainName = parts[0];
+      const relativeFilePath = parts.slice(1).join('/') || 'index.html';
+
+      const domain = domains.find(d => d.name === domainName);
+      if (!domain) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Domain not found in Keel Panel configuration.');
+        return;
+      }
+
+      const docroot = domain.docroot;
+      const filePath = path.join(docroot, relativeFilePath);
+      const resolvedPath = path.resolve(filePath);
+
+      // Directory traversal protection
+      if (!resolvedPath.startsWith(path.resolve(docroot))) {
+        res.writeHead(403, { 'Content-Type': 'text/plain' });
+        res.end('Forbidden: Access denied.');
+        return;
+      }
+
+      let finalPath = resolvedPath;
+      let isPhp = false;
+      try {
+        let stats = await fs.stat(finalPath);
+        if (stats.isDirectory()) {
+          finalPath = path.join(resolvedPath, 'index.html');
+          try {
+            await fs.stat(finalPath);
+          } catch (e) {
+            finalPath = path.join(resolvedPath, 'index.php');
+            try {
+              await fs.stat(finalPath);
+              isPhp = true;
+            } catch (e2) {
+              res.writeHead(404, { 'Content-Type': 'text/html' });
+              res.end(`<h3>Directory Index</h3><p>No index.html or index.php found in <code>${docroot}</code></p>`);
+              return;
+            }
+          }
+        } else if (finalPath.endsWith('.php')) {
+          isPhp = true;
+        }
+      } catch (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found.');
+        return;
+      }
+
+      try {
+        const fileContent = await fs.readFile(finalPath);
+        let contentType = 'text/plain';
+        if (finalPath.endsWith('.html')) contentType = 'text/html';
+        else if (finalPath.endsWith('.css')) contentType = 'text/css';
+        else if (finalPath.endsWith('.js')) contentType = 'application/javascript';
+        else if (finalPath.endsWith('.png')) contentType = 'image/png';
+        else if (finalPath.endsWith('.jpg') || finalPath.endsWith('.jpeg')) contentType = 'image/jpeg';
+        else if (finalPath.endsWith('.svg')) contentType = 'image/svg+xml';
+        else if (finalPath.endsWith('.ico')) contentType = 'image/x-icon';
+        else if (isPhp) contentType = 'text/html';
+
+        if (isPhp) {
+          const warningBanner = `<div style="background:#fff3cd;color:#856404;border:1px solid #ffeeba;padding:12px;font-family:sans-serif;margin-bottom:15px;border-radius:4px;">
+            <strong>⚠️ Site Preview Mode:</strong> This PHP file is being read statically by Keel Panel. Real PHP execution requires active DNS pointing to your web engine (Nginx/Apache).
+          </div>`;
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(warningBanner + `<pre>${fileContent.toString('utf-8')}</pre>`);
+          return;
+        }
+
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(fileContent);
+        return;
+      } catch (err) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error reading preview file.');
+        return;
+      }
+    }
+
     // Serve Frontend Client UI and static assets (with SPA routing fallback)
     if (!pathname.startsWith('/api/') && !pathname.startsWith('/promo')) {
       const distPath = path.join(WORKSPACE_ROOT, 'client', 'dist');
