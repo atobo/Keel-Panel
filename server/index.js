@@ -874,8 +874,8 @@ let protectedDirectories = {};
 
 // Authentication configurations & User database
 let users = [
-  { username: 'admin', password: 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' },
-  { username: 'tenant1', password: 'password', role: 'tenant', quota: '5 GB', created: '2026-06-25' }
+  { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' },
+  { username: 'tenant1', password: process.env.TENANT_PASSWORD || 'password', role: 'tenant', quota: '5 GB', created: '2026-06-25' }
 ];
 let activeSessions = new Map(); // token -> username
 
