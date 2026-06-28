@@ -1310,6 +1310,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/preview/') && req.method === 'GET') {
       const parts = pathname.substring(9).split('/');
       const domainName = parts[0];
+      
+      // Redirect if visiting the main preview URL without a trailing slash
+      // so browser resolves relative assets (style.css, etc.) within the preview folder correctly.
+      if (parts.length === 1 && !pathname.endsWith('/')) {
+        res.writeHead(301, { 'Location': pathname + '/' });
+        res.end();
+        return;
+      }
+
       const relativeFilePath = parts.slice(1).join('/') || 'index.html';
 
       const domain = domains.find(d => d.name === domainName);
@@ -1361,7 +1370,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const fileContent = await fs.readFile(finalPath);
         let contentType = 'text/plain';
-        if (finalPath.endsWith('.html')) contentType = 'text/html';
+        const isHtml = finalPath.endsWith('.html');
+        
+        if (isHtml) contentType = 'text/html';
         else if (finalPath.endsWith('.css')) contentType = 'text/css';
         else if (finalPath.endsWith('.js')) contentType = 'application/javascript';
         else if (finalPath.endsWith('.png')) contentType = 'image/png';
@@ -1376,6 +1387,21 @@ const server = http.createServer(async (req, res) => {
           </div>`;
           res.writeHead(200, { 'Content-Type': 'text/html' });
           res.end(warningBanner + `<pre>${fileContent.toString('utf-8')}</pre>`);
+          return;
+        }
+
+        if (isHtml) {
+          let htmlString = fileContent.toString('utf-8');
+          // Regex to match root-absolute href or src paths (e.g. href="/assets/style.css" or src="/logo.png")
+          // and prepend them with the preview route prefix, while ignoring external URLs.
+          htmlString = htmlString.replace(/(href|src)=["']\/([^"']*)["']/g, (match, attr, rPath) => {
+            if (rPath.startsWith('http://') || rPath.startsWith('https://') || rPath.startsWith('//')) {
+              return match;
+            }
+            return `${attr}="/preview/${domainName}/${rPath}"`;
+          });
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(htmlString);
           return;
         }
 
