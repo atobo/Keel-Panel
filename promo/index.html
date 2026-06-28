@@ -250,6 +250,15 @@
         <h3>HTTP Uptime & Self-Healing</h3>
         <p>Monitor HTTP ping history for subdomains. Auto-healing monitors automatically detect 5xx gateway outages and restart crashed application services.</p>
       </div>
+
+      <!-- Feature 16: DNS-Bypass Site Previews -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper blue">
+          <i data-lucide="eye"></i>
+        </div>
+        <h3>DNS-Bypass Site Previews</h3>
+        <p>Preview virtual hosts locally on port 3001 immediately after creation. Bypasses DNS propagation and hosts file modification with automatic asset path rewriting.</p>
+      </div>
     </div>
   </section>
 
@@ -304,6 +313,11 @@
             <td><strong>DNS Operations</strong></td>
             <td class="keel-column">Cloud Sync (Cloudflare, Route53, DigitalOcean APIs)</td>
             <td class="cpanel-column">Rigid local Bind9 configuration sets</td>
+          </tr>
+          <tr>
+            <td><strong>Local Site Preview</strong></td>
+            <td class="keel-column">Instant DNS-bypass preview with absolute asset path rewriting</td>
+            <td class="cpanel-column">None (Requires manual hosts file mapping or active DNS resolution)</td>
           </tr>
         </tbody>
       </table>
