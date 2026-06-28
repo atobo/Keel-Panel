@@ -1,0 +1,61 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Sandbox folders (local customer data)
+sandbox/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+logs/
+
+# IDE configurations
+.vscode/
+.idea/
+.agents/
+.gemini/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Local mock configuration & runtime state databases
+server/bind/
+server/cron.d/
+server/cron_logs.json
+server/ssl/
+
+# Production builds and build outputs
+client/dist/
+webmail/dist/
+dist/
+build/
+out/
+.next/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development & Planning Documents
+ideas.md
+isp_port_request.txt
+Q&A.md
+roadmap.md
+suggestions.md
+github_upload_instructions.md
+
+# Backups & Archives
+backups/
+*.tar.gz
+*.tgz
+*.zip
+*.rar

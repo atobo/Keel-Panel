@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keel Panel — Premium Web Control Panel & Multi-Tenant Orchestrator</title>
+  
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+  <!-- Glowing Background Accents -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <!-- Header Navigation -->
+  <header>
+    <div class="nav-container">
+      <div class="logo">
+        <i data-lucide="anchor" class="logo-icon"></i>
+        <span>Keel<span class="highlight"> Panel</span></span>
+      </div>
+      <nav>
+        <a href="#hero">Overview</a>
+        <a href="#screenshots">Gallery</a>
+        <a href="#features">Features</a>
+        <a href="#comparison">cPanel vs Keel</a>
+        <a href="#architecture">Architecture</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="http://localhost:3000" target="_blank" class="btn btn-primary">
+          <i data-lucide="external-link"></i> Launch Panel
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section id="hero" class="hero-section">
+    <div class="hero-content">
+      <div class="badge">
+        <i data-lucide="sparkles"></i> AI-Assisted Control Panel
+      </div>
+      <h1>Orchestrate Multi-Tenant Servers with <span class="text-gradient">Keel Panel</span></h1>
+      <p class="hero-subtitle">A high-performance, sandboxed web control panel for Ubuntu Server. Manage isolated tenant profiles, databases, DNS virtual hosts, and FTP/SSH with visual excellence.</p>
+      <div class="hero-buttons">
+        <a href="#features" class="btn btn-primary btn-large">Explore Features</a>
+        <a href="#comparison" class="btn btn-secondary btn-large">cPanel Comparison</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Scrolling Slideshow Banner (Carousel) -->
+  <section id="screenshots" class="slideshow-section">
+    <div class="slider-container">
+      <div class="slider-track" id="sliderTrack">
+        <!-- Slide 1 -->
+        <div class="slide active">
+          <img src="images/dashboard.png" alt="Keel Panel Administration Dashboard">
+          <div class="slide-caption">
+            <h3>Global System Summary & Metrics</h3>
+            <p>Admin dashboard with real-time resource utilization, CPU core metrics charts, and tenant count tracking.</p>
+          </div>
+        </div>
+        <!-- Slide 2 -->
+        <div class="slide">
+          <img src="images/domains.png" alt="Domains & Web Server Orchestrator">
+          <div class="slide-caption">
+            <h3>Virtual Host & Engine Configurations</h3>
+            <p>Set custom document roots, choose NGINX or Apache engines, switch PHP versions (8.1/8.2/8.3), and manage DNS records.</p>
+          </div>
+        </div>
+        <!-- Slide 3 -->
+        <div class="slide">
+          <img src="images/login.png" alt="Secure Tenant Login Screen">
+          <div class="slide-caption">
+            <h3>Role-Based Multi-Tenant Authentication</h3>
+            <p>Isolated login portal separating global administrators from bounded sandboxed hosting tenants.</p>
+          </div>
+        </div>
+        <!-- Slide 4 -->
+        <div class="slide">
+          <img src="images/logged_out.png" alt="Session Termination Portal">
+          <div class="slide-caption">
+            <h3>Secure Session Logouts</h3>
+            <p>Bearer credentials auto-expiring to guarantee workspace session security.</p>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Slider Navigation Controls -->
+      <button class="slider-btn prev-btn" id="prevBtn">
+        <i data-lucide="chevron-left"></i>
+      </button>
+      <button class="slider-btn next-btn" id="nextBtn">
+        <i data-lucide="chevron-right"></i>
+      </button>
+
+      <!-- Slider Indicators -->
+      <div class="slider-dots" id="sliderDots"></div>
+    </div>
+  </section>
+
+  <!-- Features Grid Section -->
+  <section id="features" class="features-section">
+    <div class="section-header">
+      <h2>Engineered for Scale & Security</h2>
+      <p>Keel Panel bundles essential server orchestration mechanisms into a single sleek interface.</p>
+    </div>
+    
+    <div class="features-grid">
+      <!-- Feature 1: Multi-Tenancy -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper purple">
+          <i data-lucide="users"></i>
+        </div>
+        <h3>Multi-Tenant Isolation</h3>
+        <p>Bound tenants within absolute chroot-like path sandboxes under <code>/sandbox/&lt;username&gt;</code>. Restrict file manager access, execution commands, and enforce storage quotas per user.</p>
+      </div>
+
+      <!-- Feature 2: Databases & phpMyAdmin Alternative -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper green">
+          <i data-lucide="database"></i>
+        </div>
+        <h3>SQL Client & Explorer</h3>
+        <p>Skip phpMyAdmin. Create databases, define independent DB users, and execute custom SQL queries directly inside an integrated, live table inspector and query editor.</p>
+      </div>
+
+      <!-- Feature 3: Web Server Orchestrator -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper blue">
+          <i data-lucide="globe"></i>
+        </div>
+        <h3>WebServer Orchestration</h3>
+        <p>Switch between NGINX and Apache virtual host engines. Update PHP versions (8.1, 8.2, 8.3) on the fly, toggle sites online/offline, and manage records in an integrated DNS zone file explorer.</p>
+      </div>
+
+      <!-- Feature 4: Secure FTP & SSH Keys -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper yellow">
+          <i data-lucide="key-round"></i>
+        </div>
+        <h3>FTP & SSH Keys</h3>
+        <p>Provision custom sandboxed FTP accounts. Upload SSH public keys directly to authorization files to facilitate secure, passwordless terminal administration.</p>
+      </div>
+
+      <!-- Feature 5: Cron Job Scheduler -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper orange">
+          <i data-lucide="clock"></i>
+        </div>
+        <h3>Cron Task Scheduling</h3>
+        <p>Configure daemon schedules with cron expressions. Schedule backup cycles, script execution triggers, and automated system maintenance routines.</p>
+      </div>
+
+      <!-- Feature 6: ACME SSL & Backups -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper red">
+          <i data-lucide="shield-check"></i>
+        </div>
+        <h3>SSL Auto-Renewals</h3>
+        <p>Provision zero-config Let's Encrypt certificates automatically. Keep track of certificate issuer details and trigger manuals renewals with a single click.</p>
+      </div>
+
+      <!-- Feature 7: Directory Privacy Locks -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper yellow">
+          <i data-lucide="folder-lock"></i>
+        </div>
+        <h3>Directory Privacy Locks</h3>
+        <p>Password protect sensitive web directories instantly. Restrict client folder access by assigning usernames and encrypted passwords in a simple visual checklist.</p>
+      </div>
+
+      <!-- Feature 8: Git Cloner & Deployment -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper purple">
+          <i data-lucide="git-fork"></i>
+        </div>
+        <h3>Git Repository Deployer</h3>
+        <p>Deploy code directly into sandboxed directories. Enter a repository URL and branch name to automatically clone source code and trigger live web layouts.</p>
+      </div>
+
+      <!-- Feature 9: One-Click Mail Protection -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper blue">
+          <i data-lucide="mail-check"></i>
+        </div>
+        <h3>SPF & DKIM Zone Setup</h3>
+        <p>Avoid email spam folders. With a single click inside the DNS Zone Editor, automatically generate and bind SPF and DKIM TXT protection keys to domains.</p>
+      </div>
+
+      <!-- Feature 10: AI Operations Copilot (NEW) -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper green">
+          <i data-lucide="sparkles"></i>
+        </div>
+        <h3>AI Operations Copilot</h3>
+        <p>Diagnose error log stack traces, apply immediate port-binding or heap resolution fixes on-demand, compose cron schedules, and translate English prompts into webserver configs.</p>
+      </div>
+
+      <!-- Feature 11: Real-Time WebSockets (NEW) -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper orange">
+          <i data-lucide="zap"></i>
+        </div>
+        <h3>Real-Time WebSocket Stats</h3>
+        <p>Continuous diagnostic streaming on CPU core utilization and memory footprints directly from the daemon socket with low performance overhead, bypassing heavy HTTP polling loops.</p>
+      </div>
+
+      <!-- Feature 12: Cloud-Native Integrations (NEW) -->
+      <div class="feature-card">
+        <div class="feature-icon-wrapper red">
+          <i data-lucide="cloud"></i>
+        </div>
+        <h3>Cloud-Native Integrations</h3>
+        <p>Stream compressed folder archives directly to secure remote object buckets (AWS S3, Google Cloud, Backblaze B2) and coordinate domain synchronizations to registrars (Cloudflare, Route53).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- cPanel Comparison Section -->
+  <section id="comparison" class="comparison-section">
+    <div class="section-header">
+      <h2>cPanel vs. Keel Panel</h2>
+      <p>How Keel Panel compares to traditional, legacy hosting control panels.</p>
+    </div>
+    
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>Feature Area</th>
+            <th>Keel Panel (Modern)</th>
+            <th>cPanel (Legacy)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Memory Footprint</strong></td>
+            <td class="keel-column">Ultra Lightweight (~30 MB idle memory)</td>
+            <td class="cpanel-column">Resource Heavy (Requires >1.5 GB memory)</td>
+          </tr>
+          <tr>
+            <td><strong>Pricing Model</strong></td>
+            <td class="keel-column">Self-hosted & Free Open-Source</td>
+            <td class="cpanel-column">Expensive license models per account</td>
+          </tr>
+          <tr>
+            <td><strong>Server Engine Choice</strong></td>
+            <td class="keel-column">Multi-stack selector (NGINX, Caddy, Apache)</td>
+            <td class="cpanel-column">Apache-first legacy structures</td>
+          </tr>
+          <tr>
+            <td><strong>AI Operations Copilot</strong></td>
+            <td class="keel-column">Integrated (AI log diagnostics & config rewriter)</td>
+            <td class="cpanel-column">None (Requires manual sysadmin CLI work)</td>
+          </tr>
+          <tr>
+            <td><strong>Data Backup Targets</strong></td>
+            <td class="keel-column">Secure Cloud Streams (AWS S3, GCS, Backblaze B2)</td>
+            <td class="cpanel-column">Local disk logs and directories</td>
+          </tr>
+          <tr>
+            <td><strong>Developer Workflows</strong></td>
+            <td class="keel-column">GitOps integrations, Git clones & Cmd+K palette</td>
+            <td class="cpanel-column">Manual FTP file modifications only</td>
+          </tr>
+          <tr>
+            <td><strong>DNS Operations</strong></td>
+            <td class="keel-column">Cloud Sync (Cloudflare, Route53, DigitalOcean APIs)</td>
+            <td class="cpanel-column">Rigid local Bind9 configuration sets</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Interactive Sandbox Architecture Walkthrough -->
+  <section id="architecture" class="architecture-section">
+    <div class="architecture-container">
+      <div class="architecture-info">
+        <h2>Secure Directory Bounding (Chroot Sandboxing)</h2>
+        <p>Keel Panel keeps your server secure by automatically enforcing directory path containment. Tenants can never escape their sandboxed folder structure, preventing cross-profile security breaches.</p>
+        
+        <ul class="arch-list">
+          <li>
+            <i data-lucide="shield"></i>
+            <div>
+              <strong>Absolute Bounding</strong>
+              <span>Any file read/write API checks path boundaries recursively to prevent directory traversal attacks (<code>..</code>).</span>
+            </div>
+          </li>
+          <li>
+            <i data-lucide="server"></i>
+            <div>
+              <strong>Independent Process Context</strong>
+              <span>Virtual hosts run under PHP-FPM pools matching the tenant's user profile to isolate execution permissions.</span>
+            </div>
+          </li>
+          <li>
+            <i data-lucide="hard-drive"></i>
+            <div>
+              <strong>Quota Enforcement</strong>
+              <span>Server-level folder quotas block writing actions once the tenant reaches their pre-configured limits.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="architecture-diagram">
+        <div class="diagram-box server-node">
+          <i data-lucide="server"></i> Keel Panel Host Daemon
+        </div>
+        <div class="diagram-arrow"><i data-lucide="arrow-down"></i></div>
+        <div class="diagram-row">
+          <div class="diagram-box sandbox-node">
+            <i data-lucide="folder-lock"></i> /sandbox/tenant1
+            <span class="sub-label">Sandbox Root (Isolated)</span>
+          </div>
+          <div class="diagram-box sandbox-node">
+            <i data-lucide="folder-lock"></i> /sandbox/tenant2
+            <span class="sub-label">Sandbox Root (Isolated)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="logo">
+        <i data-lucide="anchor" class="logo-icon"></i>
+        <span>Keel<span class="highlight"> Panel</span></span>
+      </div>
+      <p>&copy; 2026 Keel Panel Project. Developed under paired pair programming.</p>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

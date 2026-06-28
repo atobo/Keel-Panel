@@ -1,0 +1,48 @@
+{
+  "emails": [
+    {
+      "email": "admin@keel-wp.test",
+      "quota": "500 MB",
+      "used": "24.1 MB",
+      "owner": "tenant1"
+    },
+    {
+      "email": "info@keel-wp.test",
+      "quota": "250 MB",
+      "used": "0.0 MB",
+      "owner": "tenant1"
+    },
+    {
+      "email": "test@keel-wp.test",
+      "quota": "500 MB",
+      "used": "0.0 MB",
+      "owner": "admin"
+    }
+  ],
+  "emailForwarders": [
+    {
+      "source": "contact@keel-wp.test",
+      "destination": "admin@keel-wp.test",
+      "owner": "tenant1"
+    },
+    {
+      "source": "test@keel-wp.test",
+      "destination": "forwardtest@external.com",
+      "owner": "admin"
+    }
+  ],
+  "autoresponders": [
+    {
+      "email": "info@keel-wp.test",
+      "subject": "Out of Office Auto-Reply",
+      "message": "Hello, thank you for your email. I am currently out of the office and will respond when I return.",
+      "enabled": true,
+      "owner": "tenant1"
+    }
+  ],
+  "spamFilter": {
+    "enabled": true,
+    "scoreThreshold": 5,
+    "autoDelete": false
+  }
+}

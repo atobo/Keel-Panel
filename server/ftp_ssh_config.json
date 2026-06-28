@@ -1,0 +1,19 @@
+{
+  "ftpUsers": [
+    {
+      "username": "ftp_user1",
+      "path": "/sandbox",
+      "quota": "1 GB",
+      "status": "active",
+      "owner": "tenant1"
+    }
+  ],
+  "sshKeys": [
+    {
+      "name": "Craig Laptop",
+      "keyType": "ssh-rsa",
+      "fingerprint": "SHA256:q9k8d/uP3h9xPzK2mSdf038df...",
+      "owner": "tenant1"
+    }
+  ]
+}
