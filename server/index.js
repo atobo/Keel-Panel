@@ -2922,6 +2922,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       try {
         await generateVHost(body.name, docroot, engine, phpVersion, redirectUrl);
         MOCK_LOGS.push(`[info] Created virtual host configuration for domain: ${body.name}`);
+
+        // Automatically create document root and seed default index.html
+        await fs.mkdir(docroot, { recursive: true });
+        const welcomeFile = path.join(docroot, 'index.html');
+        if (!existsSync(welcomeFile)) {
+          const welcomeHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <title>Welcome to ${body.name}</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #0f172a; color: #f8fafc; }
+        h1 { color: #3b82f6; }
+        .card { max-width: 500px; margin: 0 auto; padding: 20px; background: #1e293b; border-radius: 8px; border: 1px solid #334155; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Welcome to ${body.name}!</h1>
+        <p>This is the default index page for your domain.</p>
+        <p>You can upload your website files to <code>${docroot}</code> via the File Manager.</p>
+    </div>
+</body>
+</html>`;
+          await fs.writeFile(welcomeFile, welcomeHtml, 'utf-8');
+        }
       } catch (err) {
         return sendJSON(res, { error: `Failed to configure virtual host: ${err.message}` }, 500);
       }
