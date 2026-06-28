@@ -1255,13 +1255,46 @@ const server = http.createServer(async (req, res) => {
   const pathname = url.pathname;
 
   try {
-    // Serve Frontend Client UI on Root "/" (bypass auth to let login form load)
-    if (pathname === '/' && req.method === 'GET') {
-      const clientIndex = path.join(WORKSPACE_ROOT, 'client', 'index.html');
-      const html = await fs.readFile(clientIndex, 'utf-8');
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html);
-      return;
+    // Serve Frontend Client UI and static assets (with SPA routing fallback)
+    if (!pathname.startsWith('/api/') && !pathname.startsWith('/promo')) {
+      const distPath = path.join(WORKSPACE_ROOT, 'client', 'dist');
+      let filePath = path.join(distPath, pathname);
+      
+      // Fallback for directory/SPA routing: if file doesn't exist or is a directory, serve index.html
+      let stats;
+      try {
+        stats = await fs.stat(filePath);
+        if (stats.isDirectory()) {
+          filePath = path.join(distPath, 'index.html');
+        }
+      } catch (err) {
+        filePath = path.join(distPath, 'index.html');
+      }
+
+      try {
+        const fileContent = await fs.readFile(filePath);
+        let contentType = 'text/plain';
+        if (filePath.endsWith('.html')) contentType = 'text/html';
+        else if (filePath.endsWith('.css')) contentType = 'text/css';
+        else if (filePath.endsWith('.js')) contentType = 'application/javascript';
+        else if (filePath.endsWith('.png')) contentType = 'image/png';
+        else if (filePath.endsWith('.jpg') || filePath.endsWith('.jpeg')) contentType = 'image/jpeg';
+        else if (filePath.endsWith('.svg')) contentType = 'image/svg+xml';
+        else if (filePath.endsWith('.ico')) contentType = 'image/x-icon';
+        
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(fileContent);
+        return;
+      } catch (err) {
+        // Fallback to source client/index.html if build does not exist yet (development fallback)
+        if (pathname === '/' || pathname === '/index.html') {
+          const clientIndex = path.join(WORKSPACE_ROOT, 'client', 'index.html');
+          const html = await fs.readFile(clientIndex, 'utf-8');
+          res.writeHead(200, { 'Content-Type': 'text/html' });
+          res.end(html);
+          return;
+        }
+      }
     }
 
     // Serve Promo Website static assets
