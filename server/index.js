@@ -684,7 +684,7 @@ async function saveBindZone(domainName, dnsRecords) {
       await fs.writeFile(tempPath, content, 'utf-8');
       await runCommandAsync(`sudo cp "${tempPath}" "/etc/bind/zones/db.${domainName}"`);
       await fs.unlink(tempPath);
-      await runCommandAsync(`sudo systemctl reload bind9`);
+      await runCommandAsync(`sudo systemctl reload named || sudo systemctl reload bind9`);
       console.log(`Successfully generated and reloaded Bind9 zone for ${domainName}`);
     } catch (err) {
       console.error(`Failed to generate real Bind9 zone for ${domainName}:`, err.message);
@@ -707,7 +707,7 @@ async function removeBindZone(domainName) {
   if (isLinux) {
     try {
       await runCommandAsync(`sudo rm -f "/etc/bind/zones/db.${domainName}"`);
-      await runCommandAsync(`sudo systemctl reload bind9`);
+      await runCommandAsync(`sudo systemctl reload named || sudo systemctl reload bind9`);
       console.log(`Successfully removed Bind9 zone file for ${domainName}`);
     } catch (err) {
       console.error(`Failed to delete real Bind9 zone for ${domainName}:`, err.message);
@@ -754,7 +754,7 @@ async function updateBindNamedConf(domainName, isDelete = false) {
       await fs.writeFile(tempPath, content, 'utf-8');
       await runCommandAsync(`sudo cp "${tempPath}" "${confPath}"`);
       await fs.unlink(tempPath);
-      await runCommandAsync(`sudo systemctl reload bind9`);
+      await runCommandAsync(`sudo systemctl reload named || sudo systemctl reload bind9`);
       console.log(`Successfully updated named.conf.local for ${domainName}`);
     } catch (err) {
       console.error(`Failed to update real named.conf.local for ${domainName}:`, err.message);

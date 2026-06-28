@@ -84,6 +84,23 @@ else
   systemctl start mariadb
 fi
 
+# Set up database administrative user for Keel Panel
+echo -e "Configuring MariaDB user for Keel Panel..."
+DB_PASS_FILE="/etc/keelpanel/db.conf"
+mkdir -p /etc/keelpanel
+if [ -f "$DB_PASS_FILE" ]; then
+  DB_PASS=$(cat "$DB_PASS_FILE")
+else
+  DB_PASS=$(openssl rand -hex 16)
+  echo "$DB_PASS" > "$DB_PASS_FILE"
+  chmod 600 "$DB_PASS_FILE"
+fi
+
+mysql -u root -e "CREATE USER IF NOT EXISTS 'keel_admin'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+mysql -u root -e "ALTER USER 'keel_admin'@'localhost' IDENTIFIED BY '${DB_PASS}';"
+mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'keel_admin'@'localhost' WITH GRANT OPTION;"
+mysql -u root -e "FLUSH PRIVILEGES;"
+
 # PHP-FPM
 if command -v php &> /dev/null; then
   echo -e "Script Runtime: \e[1;32mPHP is already installed ($(php -r 'echo PHP_VERSION;')).\e[0m"
@@ -103,11 +120,18 @@ else
 fi
 
 # DNS SERVER: Bind9
-if service_exists bind9; then
+if service_exists bind9 || service_exists named; then
   echo -e "DNS Service: \e[1;32mBind9 is already installed.\e[0m"
 else
   echo -e "\e[1;33mInstalling Bind9 local zone server...\e[0m"
   apt-get install -y bind9
+fi
+
+# Enable and start BIND using named.service if available (since bind9.service is a linked/alias unit on modern systemd)
+if service_exists named; then
+  systemctl enable named
+  systemctl start named
+else
   systemctl enable bind9
   systemctl start bind9
 fi
@@ -176,7 +200,7 @@ User=root
 WorkingDirectory=$INSTALL_DIR/server
 ExecStart=/usr/bin/node index.js
 Restart=always
-Environment=NODE_ENV=production PORT=3001
+Environment=NODE_ENV=production PORT=3001 DB_HOST=localhost DB_USER=keel_admin DB_PASSWORD=$DB_PASS
 
 [Install]
 WantedBy=multi-user.target
