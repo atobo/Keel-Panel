@@ -152,8 +152,8 @@ mkdir -p /var/log/keelpanel
 INSTALL_DIR="/opt/keel-panel"
 rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
-cp -r ../client "$INSTALL_DIR/client"
-cp -r ../server "$INSTALL_DIR/server"
+cp -r ./client "$INSTALL_DIR/client"
+cp -r ./server "$INSTALL_DIR/server"
 chown -R keel:keel "$INSTALL_DIR"
 chown -R keel:keel /var/log/keelpanel
 

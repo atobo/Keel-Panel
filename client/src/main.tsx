@@ -165,6 +165,29 @@ function App() {
   const [isExecutingCron, setIsExecutingCron] = useState<string | null>(null);
   const [executionResultModal, setExecutionResultModal] = useState<any>(null);
 
+  // Private Container Registries States
+  const [registriesList, setRegistriesList] = useState<any[]>([]);
+  const [isNewRegistryModalOpen, setIsNewRegistryModalOpen] = useState(false);
+  const [newRegistryName, setNewRegistryName] = useState('');
+  const [newRegistryUrl, setNewRegistryUrl] = useState('');
+  const [newRegistryUsername, setNewRegistryUsername] = useState('');
+  const [newRegistryToken, setNewRegistryToken] = useState('');
+
+  // Logs & Active Alert States
+  const [systemLogsList, setSystemLogsList] = useState<any[]>([]);
+  const [alertRulesList, setAlertRulesList] = useState<any[]>([]);
+  const [isNewAlertModalOpen, setIsNewAlertModalOpen] = useState(false);
+  const [newAlertName, setNewAlertName] = useState('');
+  const [newAlertTrigger, setNewAlertTrigger] = useState('OutOfMemory');
+  const [newAlertTarget, setNewAlertTarget] = useState('Slack Webhook');
+  const [newAlertEndpoint, setNewAlertEndpoint] = useState('');
+
+  // Uptime Monitors States
+  const [healthMonitorsList, setHealthMonitorsList] = useState<any[]>([]);
+  const [newMonitorDomain, setNewMonitorDomain] = useState('');
+  const [isNewMonitorModalOpen, setIsNewMonitorModalOpen] = useState(false);
+  const [autoHealingEnabled, setAutoHealingEnabled] = useState(true);
+
   // Email Manager States
   const [emailsList, setEmailsList] = useState<any[]>([]);
   const [forwardersList, setForwardersList] = useState<any[]>([]);
@@ -741,8 +764,12 @@ function App() {
       const res = await fetch('/api/domains');
       const data = await res.json();
       setDomains(data.domains || []);
+
+      const resMonitors = await fetch('/api/health/monitors');
+      const dataMonitors = await resMonitors.json();
+      setHealthMonitorsList(dataMonitors.monitors || []);
     } catch (err) {
-      addToast('Failed to load domains', 'error');
+      addToast('Failed to load domains and health monitors', 'error');
     } finally {
       setDomainsLoading(false);
     }
@@ -918,6 +945,14 @@ function App() {
       const res5 = await fetch('/api/ftp-ssh');
       const data5 = await res5.json();
       setSshKeys(data5.sshKeys || []);
+
+      const resLogs = await fetch('/api/logs/stream');
+      const dataLogs = await resLogs.json();
+      setSystemLogsList(dataLogs.logs || []);
+
+      const resAlerts = await fetch('/api/security/alerts');
+      const dataAlerts = await resAlerts.json();
+      setAlertRulesList(dataAlerts.rules || []);
     } catch (err) {
       addToast('Failed to load security suite data', 'error');
     } finally {
@@ -1467,6 +1502,10 @@ function App() {
       const data3 = await res3.json();
       setLaunchedContainers(data3.containers || []);
 
+      const resRegs = await fetch('/api/containers/registries');
+      const dataRegs = await resRegs.json();
+      setRegistriesList(dataRegs.registries || []);
+
       fetchDeveloperTokens();
     } catch (err) {
       addToast('Failed to load DX & GitOps workspace data', 'error');
@@ -1539,6 +1578,122 @@ function App() {
       }
     } catch (err) {
       addToast('Error revoking token', 'error');
+    }
+  };
+
+  // Create Container Registry Profile
+  const handleCreateRegistry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRegistryName || !newRegistryUrl || !newRegistryUsername || !newRegistryToken) {
+      addToast('All registry fields are required', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/containers/registries/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newRegistryName,
+          url: newRegistryUrl,
+          username: newRegistryUsername,
+          token: newRegistryToken
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRegistriesList(prev => [...prev, data.registry]);
+        setIsNewRegistryModalOpen(false);
+        setNewRegistryName('');
+        setNewRegistryUrl('');
+        setNewRegistryUsername('');
+        setNewRegistryToken('');
+        addToast('Private registry profile linked successfully', 'success');
+      } else {
+        addToast(data.error || 'Failed to link registry', 'error');
+      }
+    } catch (err) {
+      addToast('Error saving registry settings', 'error');
+    }
+  };
+
+  // Create Active Webhook Alert Rule
+  const handleCreateAlertRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAlertName.trim() || !newAlertEndpoint.trim()) {
+      addToast('Name and Webhook URL are required', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/security/alerts/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newAlertName,
+          trigger: newAlertTrigger,
+          target: newAlertTarget,
+          endpoint: newAlertEndpoint
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAlertRulesList(prev => [...prev, data.rule]);
+        setIsNewAlertModalOpen(false);
+        setNewAlertName('');
+        setNewAlertEndpoint('');
+        addToast('Active alert rule established', 'success');
+      } else {
+        addToast(data.error || 'Failed to save alert rule', 'error');
+      }
+    } catch (err) {
+      addToast('Error saving alert rules', 'error');
+    }
+  };
+
+  // Add HTTP Uptime Monitor
+  const handleCreateMonitor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMonitorDomain.trim()) {
+      addToast('Domain name is required', 'error');
+      return;
+    }
+    try {
+      const res = await fetch('/api/health/monitors/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: newMonitorDomain.trim() })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHealthMonitorsList(prev => [...prev, data.monitor]);
+        setIsNewMonitorModalOpen(false);
+        setNewMonitorDomain('');
+        addToast('HTTP uptime monitor registered', 'success');
+      } else {
+        addToast(data.error || 'Failed to register monitor', 'error');
+      }
+    } catch (err) {
+      addToast('Error registering monitor', 'error');
+    }
+  };
+
+  // Delete HTTP Uptime Monitor
+  const handleDeleteMonitor = async (domain: string) => {
+    if (!confirm(`Are you sure you want to suspend uptime checks for ${domain}?`)) return;
+    try {
+      const res = await fetch('/api/health/monitors/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setHealthMonitorsList(prev => prev.filter(m => m.domain !== domain));
+        addToast('Uptime monitor suspended', 'info');
+      } else {
+        addToast(data.error || 'Failed to delete monitor', 'error');
+      }
+    } catch (err) {
+      addToast('Error deleting uptime check', 'error');
     }
   };
 
@@ -3112,7 +3267,8 @@ function App() {
                   {domainsLoading ? (
                     <div>Loading active domains...</div>
                   ) : (
-                    <div className="card">
+                    <>
+                      <div className="card">
                       <table className="db-table">
                         <thead>
                           <tr>
@@ -3178,6 +3334,90 @@ function App() {
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Uptime Monitors & Self-Healing Card */}
+                    <div className="card" style={{ padding: '24px', marginTop: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fff', marginBottom: '4px' }}>HTTP Uptime Monitors & Self-Healing</h3>
+                          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Configure automated ping monitors for your subdomains. Enabled loops automatically repair crashed proxy servers or application engines.</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={autoHealingEnabled} 
+                              onChange={e => setAutoHealingEnabled(e.target.checked)} 
+                            />
+                            Auto-Healing Trigger
+                          </label>
+                          <button className="btn btn-primary" onClick={() => setIsNewMonitorModalOpen(true)}>Add Domain Check</button>
+                        </div>
+                      </div>
+
+                      <div className="db-table-container">
+                        <table className="db-table">
+                          <thead>
+                            <tr>
+                              <th>Domain Name</th>
+                              <th>Uptime Status</th>
+                              <th>Check History (Last 5 Pings)</th>
+                              <th>Last Monitored</th>
+                              <th>Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {healthMonitorsList.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No active uptime checks.</td>
+                              </tr>
+                            ) : (
+                              healthMonitorsList.map((m, idx) => (
+                                <tr key={idx}>
+                                  <td style={{ fontWeight: 600, color: 'var(--accent-blue)' }}>{m.domain}</td>
+                                  <td>
+                                    <span style={{
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 600,
+                                      background: m.status.startsWith('healthy') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                      color: m.status.startsWith('healthy') ? 'var(--success)' : 'var(--danger)'
+                                    }}>
+                                      {m.status.toUpperCase()}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                      {m.pings.map((code: number, i: number) => (
+                                        <span 
+                                          key={i} 
+                                          title={`HTTP Status: ${code}`}
+                                          style={{
+                                            width: '12px',
+                                            height: '12px',
+                                            borderRadius: '50%',
+                                            background: code === 200 ? 'var(--success)' : 'var(--danger)',
+                                            display: 'inline-block'
+                                          }}
+                                        />
+                                      ))}
+                                    </div>
+                                  </td>
+                                  <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{new Date(m.lastCheck).toLocaleTimeString()}</td>
+                                  <td>
+                                    <button className="btn-icon" onClick={() => handleDeleteMonitor(m.domain)}>
+                                      <Trash2 size={14} color="#ef4444" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    </>
                   )}
                 </div>
               )}
@@ -3223,6 +3463,13 @@ function App() {
                   onClick={() => setSecurityActiveSubTab('hotlink')}
                 >
                   Hotlink Protection
+                </button>
+                <button 
+                  className={`btn ${securityActiveSubTab === 'logs' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', borderBottom: 'none' }}
+                  onClick={() => setSecurityActiveSubTab('logs')}
+                >
+                  Log Stream & Webhooks
                 </button>
               </div>
 
@@ -3530,6 +3777,94 @@ function App() {
                               )}
                             </tbody>
                           </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB TAB: LOG STREAM & WEBHOOK ALERTS */}
+                  {securityActiveSubTab === 'logs' && (
+                    <div className="fade-in" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+                      <div className="card" style={{ padding: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                          <h4 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>System Logs Aggregator</h4>
+                          <button className="btn btn-secondary btn-small" onClick={fetchSecurityData}>Refresh Logs</button>
+                        </div>
+                        <div style={{
+                          background: '#0a0a0c',
+                          padding: '16px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-color)',
+                          fontFamily: 'monospace',
+                          fontSize: '0.8rem',
+                          maxHeight: '400px',
+                          overflowY: 'auto',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '8px'
+                        }}>
+                          {systemLogsList.length === 0 ? (
+                            <div style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '20px' }}>No logs streamed yet.</div>
+                          ) : (
+                            systemLogsList.map((log, idx) => (
+                              <div key={idx} style={{ display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '6px' }}>
+                                <span style={{ color: 'var(--text-secondary)' }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+                                <span style={{
+                                  color: log.level === 'error' ? '#ef4444' : log.level === 'warning' ? '#f59e0b' : 'var(--accent-blue)',
+                                  fontWeight: 600
+                                }}>
+                                  {log.service.toUpperCase()}:
+                                </span>
+                                <span style={{ color: log.level === 'error' ? '#fca5a5' : '#e2e8f0' }}>{log.message}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                        <div className="card" style={{ padding: '24px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h4 style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>Active Alert Rules</h4>
+                            <button className="btn btn-primary btn-small" onClick={() => setIsNewAlertModalOpen(true)}>Create Alert</button>
+                          </div>
+                          <div className="db-table-container">
+                            <table className="db-table">
+                              <thead>
+                                <tr>
+                                  <th>Rule Name</th>
+                                  <th>Trigger</th>
+                                  <th>Status</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {alertRulesList.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={3} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>No alerts rules configured.</td>
+                                  </tr>
+                                ) : (
+                                  alertRulesList.map((rule) => (
+                                    <tr key={rule.id}>
+                                      <td style={{ fontWeight: 600 }}>{rule.name}</td>
+                                      <td><code style={{ fontSize: '0.8rem' }}>{rule.trigger}</code></td>
+                                      <td>
+                                        <span style={{
+                                          padding: '2px 8px',
+                                          borderRadius: '4px',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 600,
+                                          background: rule.enabled ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                          color: rule.enabled ? 'var(--success)' : 'var(--danger)'
+                                        }}>
+                                          {rule.enabled ? 'ACTIVE' : 'DISABLED'}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -4181,6 +4516,47 @@ function App() {
                               </tbody>
                             </table>
                           </div>
+                        </div>
+                      </div>
+
+                      {/* Private Container Registries Credentials Card */}
+                      <div className="card" style={{ padding: '24px', marginTop: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                          <div>
+                            <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: '#fff', marginBottom: '4px' }}>Private Container Registries</h3>
+                            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Manage authenticated access to private Docker Hub, GitHub Container Registry (GHCR), or custom registries.</p>
+                          </div>
+                          <button className="btn btn-primary" onClick={() => setIsNewRegistryModalOpen(true)}>Link Private Registry</button>
+                        </div>
+                        <div className="db-table-container">
+                          <table className="db-table">
+                            <thead>
+                              <tr>
+                                <th>Registry Name</th>
+                                <th>URL Endpoint</th>
+                                <th>Username</th>
+                                <th>Token / Secret</th>
+                                <th>Linked Date</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {registriesList.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '24px' }}>No private registries configured yet.</td>
+                                </tr>
+                              ) : (
+                                registriesList.map((reg) => (
+                                  <tr key={reg.id}>
+                                    <td style={{ fontWeight: 600, color: 'var(--accent-blue)' }}>{reg.name}</td>
+                                    <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{reg.url}</td>
+                                    <td>{reg.username}</td>
+                                    <td style={{ fontFamily: 'monospace' }}>{reg.token}</td>
+                                    <td style={{ color: 'var(--text-secondary)' }}>{new Date(reg.created).toLocaleDateString()}</td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>
@@ -6225,7 +6601,11 @@ function App() {
               <button className="btn-icon" style={{ border: 'none' }} onClick={() => setIsNewForwarderModalOpen(false)}>
                 <X size={18} />
               </button>
-                         <input 
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Source Email Address</label>
+                <input 
                   type="text" 
                   className="form-input" 
                   placeholder="e.g. contact@keel-wp.test"
@@ -6934,6 +7314,15 @@ function App() {
                 />
               </div>
               <div className="form-group">
+                <label className="form-label">Target Registry Profile (Optional)</label>
+                <select className="form-input">
+                  <option value="public">Docker Hub Public Registry</option>
+                  {registriesList.map(r => (
+                    <option key={r.id} value={r.id}>{r.name} ({r.url})</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Port Bindings (HostPort:ContainerPort)</label>
                 <input 
                   type="text" 
@@ -6949,6 +7338,169 @@ function App() {
               <button className="btn btn-primary" onClick={handleLaunchContainer}>Launch Container</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MODAL: LINK PRIVATE REGISTRY */}
+      {isNewRegistryModalOpen && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleCreateRegistry} style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title font-semibold">Link Private Container Registry</h3>
+              <button type="button" className="btn-icon" style={{ border: 'none' }} onClick={() => setIsNewRegistryModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Registry Provider Name</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. GitHub Container Registry (GHCR)"
+                  value={newRegistryName}
+                  onChange={e => setNewRegistryName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Registry URL Endpoint</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. ghcr.io"
+                  value={newRegistryUrl}
+                  onChange={e => setNewRegistryUrl(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Username / Account Name</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. keel-operator"
+                  value={newRegistryUsername}
+                  onChange={e => setNewRegistryUsername(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Access Token / Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  placeholder="••••••••••••••••"
+                  value={newRegistryToken}
+                  onChange={e => setNewRegistryToken(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsNewRegistryModalOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Link Registry</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: CREATE ALERT RULE */}
+      {isNewAlertModalOpen && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleCreateAlertRule} style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title font-semibold">Create Webhook Alert Rule</h3>
+              <button type="button" className="btn-icon" style={{ border: 'none' }} onClick={() => setIsNewAlertModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Alert Rule Name</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. Memory Limit Warning"
+                  value={newAlertName}
+                  onChange={e => setNewAlertName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Trigger Condition</label>
+                <select 
+                  className="form-input"
+                  value={newAlertTrigger}
+                  onChange={e => setNewAlertTrigger(e.target.value)}
+                >
+                  <option value="OutOfMemory">OutOfMemory Error Signature</option>
+                  <option value="502BadGateway">502 Bad Gateway Response</option>
+                  <option value="HighCPU">CPU load exceeds 95%</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Target Notification</label>
+                <select 
+                  className="form-input"
+                  value={newAlertTarget}
+                  onChange={e => setNewAlertTarget(e.target.value)}
+                >
+                  <option value="Slack Webhook">Slack Webhook URL</option>
+                  <option value="Discord Webhook">Discord Webhook Channel</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Webhook Destination URL</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="https://hooks.slack.com/services/..."
+                  value={newAlertEndpoint}
+                  onChange={e => setNewAlertEndpoint(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsNewAlertModalOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Create Alert</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* MODAL: ADD DOMAIN CHECK */}
+      {isNewMonitorModalOpen && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleCreateMonitor} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title font-semibold">Add HTTP Uptime Monitor</h3>
+              <button type="button" className="btn-icon" style={{ border: 'none' }} onClick={() => setIsNewMonitorModalOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Target Domain / Subdomain</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. blog.keel-wp.test"
+                  value={newMonitorDomain}
+                  onChange={e => setNewMonitorDomain(e.target.value)}
+                  required
+                />
+              </div>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                Uptime ping tests will query this domain at standard HTTP/HTTPS ports. Webhook alert triggers will fire if a 5xx Bad Gateway is logged.
+              </span>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsNewMonitorModalOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Add Monitor</button>
+            </div>
+          </form>
         </div>
       )}
 

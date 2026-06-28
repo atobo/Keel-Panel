@@ -226,6 +226,39 @@ let developerTokens = [
   { token: 'keel_dev_testtoken12345', username: 'admin', label: 'Default CLI Token', created: new Date().toISOString() }
 ];
 
+let containerRegistries = [
+  { id: '1', name: 'Docker Hub Private', url: 'index.docker.io/v1/', username: 'keel_operator', token: '••••••••', created: new Date().toISOString() }
+];
+
+let alertRules = [
+  { id: '1', name: 'Slack Webhook Alert', trigger: 'OutOfMemory', target: 'Slack Webhook', enabled: true, endpoint: 'https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX' }
+];
+
+let healthMonitors = [
+  { domain: 'keel-wp.test', status: 'healthy', lastCheck: new Date().toISOString(), pings: [200, 200, 200, 200, 200] }
+];
+
+let systemLogStream = [
+  { timestamp: new Date(Date.now() - 3600000).toISOString(), service: 'systemd', message: 'Starting Keel Panel Premium Control Panel Daemon...', level: 'info' },
+  { timestamp: new Date(Date.now() - 3590000).toISOString(), service: 'mysql', message: 'MariaDB 10.11 Database server initialized.', level: 'info' },
+  { timestamp: new Date(Date.now() - 3580000).toISOString(), service: 'nginx', message: 'Nginx master process started. Virtual hosts loaded successfully.', level: 'info' },
+  { timestamp: new Date(Date.now() - 3570000).toISOString(), service: 'bind9', message: 'Bind9 DNS zone database synchronized.', level: 'info' },
+  { timestamp: new Date().toISOString(), service: 'keel-daemon', message: 'Keel Panel background API listener started.', level: 'info' }
+];
+
+function addSystemLog(service, message, level = 'info') {
+  systemLogStream.push({
+    timestamp: new Date().toISOString(),
+    service,
+    message,
+    level
+  });
+  if (systemLogStream.length > 200) {
+    systemLogStream.shift();
+  }
+}
+
+
 const CRON_LOGS_FILE = path.join(WORKSPACE_ROOT, 'server', 'cron_logs.json');
 
 async function loadCronLogs() {
@@ -1392,9 +1425,19 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, { success: true, tokens: userTokens });
       }
 
-      // API Developer Tokens POST (Generate)
+      // API Developer Tokens POST (Generate & Revoke)
       if (pathname === '/api/developer/tokens' && req.method === 'POST') {
         const body = await parseBody(req);
+        if (body.token) {
+          const tokenToDelete = body.token;
+          const initialLen = developerTokens.length;
+          developerTokens = developerTokens.filter(t => !(t.token === tokenToDelete && t.username === activeUser));
+          if (developerTokens.length < initialLen) {
+            return sendJSON(res, { success: true });
+          } else {
+            return sendJSON(res, { error: 'Token not found or unauthorized' }, 404);
+          }
+        }
         if (!body.label || !body.label.trim()) {
           return sendJSON(res, { error: 'Label is required' }, 400);
         }
@@ -1410,17 +1453,102 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, { success: true, token: newTokenObj });
       }
 
-      // API Developer Tokens DELETE (Revoke)
-      if (pathname === '/api/developer/tokens' && req.method === 'POST') { // we can use POST for simple DELETE emulation in mock router
+      // API Logs Stream GET
+      if (pathname === '/api/logs/stream' && req.method === 'GET') {
+        return sendJSON(res, { success: true, logs: systemLogStream });
+      }
+
+      // API Alert Rules GET
+      if (pathname === '/api/security/alerts' && req.method === 'GET') {
+        return sendJSON(res, { success: true, rules: alertRules });
+      }
+
+      // API Alert Rules POST (Save)
+      if (pathname === '/api/security/alerts/save' && req.method === 'POST') {
         const body = await parseBody(req);
-        const tokenToDelete = body.token;
-        const initialLen = developerTokens.length;
-        developerTokens = developerTokens.filter(t => !(t.token === tokenToDelete && t.username === activeUser));
-        if (developerTokens.length < initialLen) {
-          return sendJSON(res, { success: true });
-        } else {
-          return sendJSON(res, { error: 'Token not found or unauthorized' }, 404);
+        if (!body.name || !body.endpoint) {
+          return sendJSON(res, { error: 'Rule name and webhook endpoint are required' }, 400);
         }
+        const newRule = {
+          id: body.id || String(alertRules.length + 1),
+          name: body.name,
+          trigger: body.trigger || 'OutOfMemory',
+          target: body.target || 'Slack Webhook',
+          enabled: body.enabled !== false,
+          endpoint: body.endpoint
+        };
+        if (body.id) {
+          alertRules = alertRules.map(r => r.id === body.id ? newRule : r);
+        } else {
+          alertRules.push(newRule);
+        }
+        addSystemLog('security', `Alert rule "${body.name}" saved successfully.`, 'info');
+        return sendJSON(res, { success: true, rule: newRule });
+      }
+
+      // API Container Registries GET
+      if (pathname === '/api/containers/registries' && req.method === 'GET') {
+        return sendJSON(res, { success: true, registries: containerRegistries });
+      }
+
+      // API Container Registries POST (Save)
+      if (pathname === '/api/containers/registries/save' && req.method === 'POST') {
+        const body = await parseBody(req);
+        if (!body.name || !body.url || !body.username || !body.token) {
+          return sendJSON(res, { error: 'All fields are required' }, 400);
+        }
+        const newRegistry = {
+          id: body.id || String(containerRegistries.length + 1),
+          name: body.name,
+          url: body.url,
+          username: body.username,
+          token: '••••••••',
+          created: new Date().toISOString()
+        };
+        if (body.id) {
+          containerRegistries = containerRegistries.map(r => r.id === body.id ? newRegistry : r);
+        } else {
+          containerRegistries.push(newRegistry);
+        }
+        addSystemLog('container-manager', `Linked private registry profile "${body.name}".`, 'info');
+        return sendJSON(res, { success: true, registry: newRegistry });
+      }
+
+      // API Uptime Health Monitors GET
+      if (pathname === '/api/health/monitors' && req.method === 'GET') {
+        return sendJSON(res, { success: true, monitors: healthMonitors });
+      }
+
+      // API Uptime Health Monitors POST (Add)
+      if (pathname === '/api/health/monitors/add' && req.method === 'POST') {
+        const body = await parseBody(req);
+        if (!body.domain) {
+          return sendJSON(res, { error: 'Domain name is required' }, 400);
+        }
+        const exists = healthMonitors.some(m => m.domain === body.domain);
+        if (exists) {
+          return sendJSON(res, { error: 'Monitor already exists for this domain' }, 400);
+        }
+        const newMonitor = {
+          domain: body.domain,
+          status: 'healthy',
+          lastCheck: new Date().toISOString(),
+          pings: [200, 200, 200, 200, 200]
+        };
+        healthMonitors.push(newMonitor);
+        addSystemLog('health-monitor', `Registered HTTP health monitoring check for ${body.domain}.`, 'info');
+        return sendJSON(res, { success: true, monitor: newMonitor });
+      }
+
+      // API Uptime Health Monitors POST (Delete)
+      if (pathname === '/api/health/monitors/delete' && req.method === 'POST') {
+        const body = await parseBody(req);
+        if (!body.domain) {
+          return sendJSON(res, { error: 'Domain is required' }, 400);
+        }
+        healthMonitors = healthMonitors.filter(m => m.domain !== body.domain);
+        addSystemLog('health-monitor', `Suspended health monitoring checks for ${body.domain}.`, 'warning');
+        return sendJSON(res, { success: true });
       }
     }
     // API System Stats
@@ -4195,6 +4323,42 @@ server.on('upgrade', (request, socket, head) => {
 server.on('error', (err) => {
   console.error('Server socket error:', err);
 });
+
+// Background Health Checks & Auto-Healing Simulation
+setInterval(() => {
+  healthMonitors.forEach(monitor => {
+    monitor.lastCheck = new Date().toISOString();
+    
+    // 15% chance to simulate a crash if currently healthy
+    if (monitor.status === 'healthy' && Math.random() < 0.15) {
+      monitor.status = 'unhealthy (502 Gateway Error)';
+      monitor.pings.shift();
+      monitor.pings.push(502);
+      
+      addSystemLog('health-monitor', `HTTP Uptime check failed for ${monitor.domain}. HTTP Status: 502 Bad Gateway`, 'error');
+      
+      // Trigger Slack Alert Webhook simulated action
+      alertRules.forEach(rule => {
+        if (rule.enabled) {
+          addSystemLog('alerts-sender', `[ALERT TRIGGERED] Sent webhook alert to ${rule.endpoint} (Trigger: ${rule.trigger})`, 'warning');
+        }
+      });
+      
+      // Schedule Auto-Healing 10 seconds later
+      setTimeout(() => {
+        monitor.status = 'healthy';
+        monitor.pings.shift();
+        monitor.pings.push(200);
+        addSystemLog('auto-healing', `Self-healing loop triggered for ${monitor.domain}. Restarted PHP-FPM and reloaded Nginx proxy configuration. Service recovered to 200 OK.`, 'info');
+      }, 10000);
+    } else if (monitor.status === 'healthy') {
+      // Normal ping check
+      monitor.pings.shift();
+      monitor.pings.push(200);
+      addSystemLog('health-monitor', `HTTP Uptime check passed for ${monitor.domain}. Status: 200 OK`, 'info');
+    }
+  });
+}, 30000);
 
 server.listen(PORT, () => {
   console.log(`Keel Panel Backend running on http://localhost:${PORT}`);

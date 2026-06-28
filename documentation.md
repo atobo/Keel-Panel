@@ -147,6 +147,28 @@ Administrative tools to manage the global server state.
 *   **Register Daemon Application**: Assign custom Node, Bun, Python, or Go startup entry scripts, configure port bindings, and append system environment variables.
 *   **Container Launcher**: Spawn isolated lightweight Docker containers by defining registry images and host port mappings.
 
+### 🔄 4. Updating the Control Panel (Zero Data Loss)
+To update the panel to the latest code changes without affecting custom settings, database tables, or tenant sandbox directories:
+1. Navigate to the panel installation folder:
+   ```bash
+   cd /opt/keel-panel
+   ```
+2. Pull the updated codebase:
+   ```bash
+   sudo git pull origin main
+   ```
+3. Sync Node dependencies for the server:
+   ```bash
+   cd server && npm install --production
+   ```
+4. Recompile client assets (if frontend changes are present):
+   ```bash
+   cd ../client && npm install && npm run build
+   ```
+5. Restart the background panel daemon:
+   *   If using **PM2**: `sudo -u keel pm2 restart keel-backend`
+   *   If using **Systemd**: `sudo systemctl restart keelpanel`
+
 ---
 
 ## 💻 Part 3: Tenant / End-User User Manual
