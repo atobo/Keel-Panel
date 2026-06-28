@@ -119,6 +119,34 @@ else
   systemctl start vsftpd
 fi
 
+# MAIL SERVER: Postfix
+if command -v postfix &> /dev/null; then
+  echo -e "Mail Service: \e[1;32mPostfix is already installed.\e[0m"
+else
+  echo -e "\e[1;33mInstalling Postfix mail transfer agent...\e[0m"
+  echo "postfix postfix/main_mailer_type string 'Internet Site'" | debconf-set-selections
+  echo "postfix postfix/mailname string localhost" | debconf-set-selections
+  apt-get install -y postfix
+  systemctl enable postfix
+  systemctl start postfix
+fi
+
+# Configure Postfix Outbound Staggering & Rate-Limiting
+POSTFIX_MAIN_CF="/etc/postfix/main.cf"
+if [ -f "$POSTFIX_MAIN_CF" ]; then
+  echo "Configuring Postfix queue throttling parameters..."
+  # Clean up existing parameters to prevent duplicates
+  sed -i '/default_destination_rate_delay/d' "$POSTFIX_MAIN_CF"
+  sed -i '/default_destination_concurrency_limit/d' "$POSTFIX_MAIN_CF"
+  
+  # Append new throttling configuration
+  echo "default_destination_rate_delay = 2s" >> "$POSTFIX_MAIN_CF"
+  echo "default_destination_concurrency_limit = 2" >> "$POSTFIX_MAIN_CF"
+  
+  systemctl restart postfix
+  echo -e "Postfix queue throttling configured: \e[1;32m$POSTFIX_MAIN_CF\e[0m"
+fi
+
 # DNS SERVER: Bind9
 if service_exists bind9 || service_exists named; then
   echo -e "DNS Service: \e[1;32mBind9 is already installed.\e[0m"

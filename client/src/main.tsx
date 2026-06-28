@@ -196,7 +196,15 @@ function App() {
   const [spamSettings, setSpamSettings] = useState<any>({ enabled: false, scoreThreshold: 5.0, autoDelete: false });
   const [webmailMessagesList, setWebmailMessagesList] = useState<any[]>([]);
   const [emailsLoading, setEmailsLoading] = useState(true);
-  const [emailActiveSubTab, setEmailActiveSubTab] = useState<'accounts' | 'forwarders' | 'autoresponders' | 'spam' | 'webmail'>('accounts');
+  const [emailActiveSubTab, setEmailActiveSubTab] = useState<'accounts' | 'forwarders' | 'autoresponders' | 'spam' | 'webmail' | 'relay'>('accounts');
+
+  // SMTP Relay Configuration States
+  const [relayEnabled, setRelayEnabled] = useState(false);
+  const [relayHost, setRelayHost] = useState('smtp.mailersend.net');
+  const [relayPort, setRelayPort] = useState(587);
+  const [relayUsername, setRelayUsername] = useState('');
+  const [relayPassword, setRelayPassword] = useState('');
+  const [relaySaving, setRelaySaving] = useState(false);
 
   // Modals for emails
   const [isNewEmailModalOpen, setIsNewEmailModalOpen] = useState(false);
@@ -348,6 +356,7 @@ function App() {
   const [aiCronPrompt, setAiCronPrompt] = useState('');
   const [aiCronResult, setAiCronResult] = useState('');
   const [aiCronExplanation, setAiCronExplanation] = useState('');
+  const [aiCronCommand, setAiCronCommand] = useState('');
   const [aiCronLoading, setAiCronLoading] = useState(false);
 
   // Cloud Integrations States
@@ -574,6 +583,7 @@ function App() {
     setAiCronLoading(true);
     setAiCronResult('');
     setAiCronExplanation('');
+    setAiCronCommand('');
     try {
       const res = await fetch('/api/ai/compose-cron', {
         method: 'POST',
@@ -584,6 +594,7 @@ function App() {
       if (data.success) {
         setAiCronResult(data.cron);
         setAiCronExplanation(data.explanation);
+        setAiCronCommand(data.command || 'echo "Executed AI scheduled task"');
         addToast('Cron schedule composed!', 'success');
       } else {
         addToast('Failed to compose cron schedule', 'error');
@@ -603,7 +614,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           schedule: aiCronResult,
-          command: 'echo "Executed AI scheduled task"',
+          command: aiCronCommand || 'echo "Executed AI scheduled task"',
           description: `AI Generated: ${aiCronPrompt}`
         })
       });
@@ -1149,6 +1160,49 @@ function App() {
     }
   };
 
+  const fetchMailRelayConfig = async () => {
+    try {
+      const res = await fetch('/api/emails/relay');
+      const data = await res.json();
+      if (data.config) {
+        setRelayEnabled(data.config.enabled);
+        setRelayHost(data.config.host);
+        setRelayPort(data.config.port);
+        setRelayUsername(data.config.username);
+        setRelayPassword(data.config.password);
+      }
+    } catch (err) {
+      console.error('Failed to load SMTP relay settings');
+    }
+  };
+
+  const handleSaveRelayConfig = async () => {
+    setRelaySaving(true);
+    try {
+      const res = await fetch('/api/emails/relay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: relayEnabled,
+          host: relayHost,
+          port: Number(relayPort),
+          username: relayUsername,
+          password: relayPassword
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast('SMTP Relay configuration updated successfully', 'success');
+      } else {
+        addToast(data.error || 'Failed to update SMTP Relay settings', 'error');
+      }
+    } catch (err) {
+      addToast('Error saving SMTP Relay settings', 'error');
+    } finally {
+      setRelaySaving(false);
+    }
+  };
+
   const fetchEmailData = async () => {
     setEmailsLoading(true);
     try {
@@ -1158,6 +1212,9 @@ function App() {
       setForwardersList(data.emailForwarders || []);
       setAutorespondersList(data.autoresponders || []);
       setSpamSettings(data.spamFilter || { enabled: false, scoreThreshold: 5.0, autoDelete: false });
+      if (role === 'admin') {
+        await fetchMailRelayConfig();
+      }
     } catch (err) {
       addToast('Failed to load email server data', 'error');
     } finally {
@@ -3953,7 +4010,15 @@ function App() {
                 >
                   Spam Filter
                 </button>
-
+                {role === 'admin' && (
+                  <button 
+                    className={`btn ${emailActiveSubTab === 'relay' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ padding: '8px 16px', borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0', borderBottom: 'none' }}
+                    onClick={() => setEmailActiveSubTab('relay')}
+                  >
+                    SMTP Relay Settings
+                  </button>
+                )}
               </div>
 
               {emailsLoading ? (
@@ -4208,6 +4273,97 @@ function App() {
                             </div>
                           </div>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB TAB: SMTP RELAY */}
+                  {emailActiveSubTab === 'relay' && role === 'admin' && (
+                    <div className="fade-in">
+                      <div style={{ marginBottom: '20px' }}>
+                        <h4 style={{ fontSize: '1rem', fontWeight: 600 }}>SMTP Relay (Smart Host) Settings</h4>
+                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Route all outgoing email via a third-party relay (e.g. MailerSend, Amazon SES) to guarantee delivery and protect your server IP from blacklists.</p>
+                      </div>
+
+                      <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '24px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+                          <div>
+                            <strong style={{ display: 'block', fontSize: '0.95rem' }}>Enable Outbound SMTP Relay</strong>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Route all server emails through this relay instead of sending directly from the host IP</span>
+                          </div>
+                          <button 
+                            className={`btn ${relayEnabled ? 'btn-secondary' : 'btn-primary'}`}
+                            onClick={() => setRelayEnabled(!relayEnabled)}
+                          >
+                            {relayEnabled ? 'Disable SMTP Relay' : 'Enable SMTP Relay'}
+                          </button>
+                        </div>
+
+                        {relayEnabled && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} className="fade-in">
+                            <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px' }}>
+                              <div className="form-group">
+                                <label className="form-label">SMTP Host / Server</label>
+                                <input 
+                                  type="text" 
+                                  className="form-input" 
+                                  placeholder="e.g. smtp.mailersend.net" 
+                                  value={relayHost} 
+                                  onChange={e => setRelayHost(e.target.value)} 
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Port</label>
+                                <input 
+                                  type="number" 
+                                  className="form-input" 
+                                  placeholder="587" 
+                                  value={relayPort} 
+                                  onChange={e => setRelayPort(Number(e.target.value))} 
+                                />
+                              </div>
+                            </div>
+
+                            <div className="form-group">
+                              <label className="form-label">SMTP Username</label>
+                              <input 
+                                type="text" 
+                                className="form-input" 
+                                placeholder="Enter SMTP username / API username" 
+                                value={relayUsername} 
+                                onChange={e => setRelayUsername(e.target.value)} 
+                              />
+                            </div>
+
+                            <div className="form-group">
+                              <label className="form-label">SMTP Password / API Key</label>
+                              <input 
+                                type="password" 
+                                className="form-input" 
+                                placeholder="••••••••••••••••" 
+                                value={relayPassword} 
+                                onChange={e => setRelayPassword(e.target.value)} 
+                              />
+                            </div>
+
+                            <div className="alert alert-info" style={{ display: 'flex', gap: '10px', padding: '12px 16px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem' }}>
+                              <i data-lucide="info" style={{ color: 'var(--accent-blue)', flexShrink: 0 }}></i>
+                              <div>
+                                <strong>Important DNS setup:</strong> Ensure your domain's SPF, DKIM, and DMARC TXT records are fully configured in the DNS Zone Editor to match your relay settings.
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                          <button 
+                            className="btn btn-primary" 
+                            disabled={relaySaving} 
+                            onClick={handleSaveRelayConfig}
+                          >
+                            {relaySaving ? 'Saving...' : 'Save Configuration'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -5035,6 +5191,16 @@ function App() {
                             <p style={{ fontSize: '0.9rem', color: '#fff', fontWeight: 500, margin: 0 }}>
                               {aiCronExplanation}
                             </p>
+                          </div>
+
+                          <div>
+                            <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-secondary)', fontWeight: 600, marginBottom: '8px' }}>Generated Task Command / Script</div>
+                            <textarea
+                              className="form-input"
+                              style={{ fontFamily: 'monospace', fontSize: '0.85rem', color: '#f8fafc', background: '#0f172a', border: '1px solid var(--border-color)', borderRadius: '6px', padding: '10px', width: '100%', resize: 'vertical', minHeight: '60px' }}
+                              value={aiCronCommand}
+                              onChange={e => setAiCronCommand(e.target.value)}
+                            />
                           </div>
 
                           <div style={{ background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.2)', padding: '16px', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
@@ -6213,7 +6379,7 @@ function App() {
                 <input 
                   type="text" 
                   className="form-input" 
-                  placeholder="Defaults to /sandbox/<user>"
+                  placeholder="Defaults to /sandbox/<user>/<domain_name>"
                   value={newDomainDocroot}
                   onChange={e => setNewDomainDocroot(e.target.value)}
                 />
@@ -6381,6 +6547,27 @@ function App() {
                   value={chmodMode}
                   onChange={e => setChmodMode(e.target.value)}
                 />
+              </div>
+              <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
+                <span style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Recommended Octal References:</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)' }}>
+                    <span><code style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>644</code> — Standard Files (HTML, PHP, JPG)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Read/Write (User), Read (Group/Public)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)' }}>
+                    <span><code style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>755</code> — Directories & Shell Scripts</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Full (User), Read/Execute (Group/Public)</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(255,255,255,0.02)', borderRadius: 'var(--radius-sm)' }}>
+                    <span><code style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>600</code> — Private Configuration (e.g. <code>.env</code>)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Full (User only), Restricted for others</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px', background: 'rgba(239, 68, 68, 0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                    <span style={{ color: 'var(--accent-red)' }}><code style={{ fontWeight: 600 }}>777</code> — Publicly Writable (⚠️ Dangerous)</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>Unrestricted access for anyone</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="modal-footer">

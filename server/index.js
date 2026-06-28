@@ -217,6 +217,45 @@ async function loadEmailsConfig() {
   }
 }
 
+// Mail Relay SMTP Configurations File
+const MAIL_RELAY_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'mail_relay_config.json');
+
+async function initMailRelayConfig() {
+  if (!existsSync(MAIL_RELAY_CONFIG_FILE)) {
+    const initialConfig = {
+      enabled: false,
+      host: 'smtp.mailersend.net',
+      port: 587,
+      username: '',
+      password: ''
+    };
+    try {
+      await fs.writeFile(MAIL_RELAY_CONFIG_FILE, JSON.stringify(initialConfig, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to initialize Mail Relay config file:', err);
+    }
+  }
+}
+initMailRelayConfig();
+
+async function saveMailRelayConfig(config) {
+  try {
+    await fs.writeFile(MAIL_RELAY_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save mail relay config:', err);
+  }
+}
+
+async function loadMailRelayConfig() {
+  try {
+    const content = await fs.readFile(MAIL_RELAY_CONFIG_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch (err) {
+    console.error('Failed to load mail relay config:', err);
+    return { enabled: false, host: 'smtp.mailersend.net', port: 587, username: '', password: '' };
+  }
+}
+
 // Cloud Integrations Mock Stores
 let cloudBackups = [
   { id: '1', date: new Date(Date.now() - 3600000 * 24 * 2).toISOString(), provider: 's3', size: '124.5 MB', status: 'completed', path: 's3://keel-backups/backup_2026-06-24.tar.gz' },
@@ -1058,6 +1097,22 @@ function getUserSandboxPath(username, reqPath) {
   return resolved;
 }
 
+function resolveSandboxPath(userPath, activeUser) {
+  if (!userPath) return path.join(SANDBOX_DIR, activeUser);
+  
+  // Normalize and resolve /sandbox prefix to the actual local SANDBOX_DIR
+  if (userPath.startsWith('/sandbox/') || userPath === '/sandbox') {
+    return path.join(SANDBOX_DIR, userPath.substring(8));
+  }
+  if (userPath.startsWith('sandbox/') || userPath === 'sandbox') {
+    return path.join(SANDBOX_DIR, userPath.substring(7));
+  }
+  if (path.isAbsolute(userPath) && !userPath.startsWith('/')) {
+    return userPath;
+  }
+  return path.resolve(SANDBOX_DIR, userPath.replace(/^\//, ''));
+}
+
 // Helper to send JSON responses
 function sendJSON(res, data, status = 200) {
   res.writeHead(status, {
@@ -1878,6 +1933,7 @@ const server = http.createServer(async (req, res) => {
 
       let cron = '*/5 * * * *';
       let explanation = 'Run once every 5 minutes (default fallback suggestion).';
+      let command = `echo "Executed AI task: ${body.prompt || 'unnamed script'}"`;
 
       if (prompt.includes('minute')) {
         cron = '* * * * *';
@@ -1894,11 +1950,36 @@ const server = http.createServer(async (req, res) => {
       } else if (prompt.includes('15 minutes') || prompt.includes('fifteen minutes')) {
         cron = '*/15 * * * *';
         explanation = 'Runs every 15 minutes.';
+      } else if (prompt.includes('2am') || prompt.includes('2 am')) {
+        cron = '0 2 * * *';
+        explanation = 'Runs at exactly 02:00 AM every day.';
+      } else if (prompt.includes('3am') || prompt.includes('3 am')) {
+        cron = '0 3 * * *';
+        explanation = 'Runs at exactly 03:00 AM every day.';
+      } else if (prompt.includes('4am') || prompt.includes('4 am')) {
+        cron = '0 4 * * *';
+        explanation = 'Runs at exactly 04:00 AM every day.';
+      } else if (prompt.includes('5am') || prompt.includes('5 am')) {
+        cron = '0 5 * * *';
+        explanation = 'Runs at exactly 05:00 AM every day.';
       } else if (prompt.includes('weekdays') || prompt.includes('monday to friday')) {
         cron = '0 0 * * 1-5';
         explanation = 'Runs at exactly 00:00 (midnight) on Monday, Tuesday, Wednesday, Thursday, and Friday.';
       }
 
+      if (prompt.includes('backup') || prompt.includes('dump') || prompt.includes('db ')) {
+        command = `pg_dump -U keel_admin keel_prod_db > /sandbox/${activeUser}/backups/db_backup_$(date +%F_%H%M%S).sql`;
+      } else if (prompt.includes('git') || prompt.includes('pull') || prompt.includes('deploy')) {
+        command = `cd /sandbox/${activeUser}/app && git checkout main && git pull origin main && npm run build`;
+      } else if (prompt.includes('cleanup') || prompt.includes('clear') || prompt.includes('log') || prompt.includes('truncate')) {
+        command = `find /sandbox/${activeUser}/ -name "*.log" -exec truncate -s 0 {} \\;`;
+      } else if (prompt.includes('cert') || prompt.includes('renew') || prompt.includes('ssl')) {
+        command = `certbot renew --quiet && systemctl reload nginx`;
+      } else if (prompt.includes('restart') || prompt.includes('reboot')) {
+        command = `pm2 restart all || systemctl restart keelpanel`;
+      }
+
+      return sendJSON(res, { success: true, cron, explanation, command });
     }
 
     // Cloud-Native Backup Integrations
@@ -2940,7 +3021,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const exists = domains.some(d => d.name === body.name);
       if (exists) return sendJSON(res, { error: 'Domain already registered' }, 400);
 
-      const docroot = body.docroot || path.join(SANDBOX_DIR, activeUser);
+      const docroot = resolveSandboxPath(body.docroot || `/sandbox/${activeUser}/${body.name}`, activeUser);
       const engine = body.engine || 'nginx';
       const phpVersion = body.phpVersion || '8.2';
       const redirectUrl = body.redirectUrl || null;
@@ -3378,6 +3459,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       return sendJSON(res, { success: true, messages: webmailMessages });
     }
 
+    // GET SMTP Relay config
+    if (pathname === '/api/emails/relay' && req.method === 'GET') {
+      if (!isSystemAdmin) return sendJSON(res, { error: 'Unauthorized' }, 403);
+      const config = await loadMailRelayConfig();
+      return sendJSON(res, { success: true, config });
+    }
+
+    // POST SMTP Relay config
+    if (pathname === '/api/emails/relay' && req.method === 'POST') {
+      if (!isSystemAdmin) return sendJSON(res, { error: 'Unauthorized' }, 403);
+      const config = await parseBody(req);
+      
+      await saveMailRelayConfig(config);
+      
+      const isLinux = process.platform === 'linux';
+      if (isLinux) {
+        try {
+          const mainCf = '/etc/postfix/main.cf';
+          const saslPasswd = '/etc/postfix/sasl_passwd';
+          
+          if (existsSync(mainCf)) {
+            // Delete existing configs to avoid duplicates
+            await runCommandAsync(`sudo sed -i '/relayhost/d' ${mainCf}`);
+            await runCommandAsync(`sudo sed -i '/smtp_sasl_auth_enable/d' ${mainCf}`);
+            await runCommandAsync(`sudo sed -i '/smtp_sasl_password_maps/d' ${mainCf}`);
+            await runCommandAsync(`sudo sed -i '/smtp_sasl_security_options/d' ${mainCf}`);
+            await runCommandAsync(`sudo sed -i '/smtp_use_tls/d' ${mainCf}`);
+
+            if (config.enabled) {
+              await runCommandAsync(`sudo sh -c "echo 'relayhost = [${config.host}]:${config.port}' >> ${mainCf}"`);
+              await runCommandAsync(`sudo sh -c "echo 'smtp_sasl_auth_enable = yes' >> ${mainCf}"`);
+              await runCommandAsync(`sudo sh -c "echo 'smtp_sasl_password_maps = hash:${saslPasswd}' >> ${mainCf}"`);
+              await runCommandAsync(`sudo sh -c "echo 'smtp_sasl_security_options = noanonymous' >> ${mainCf}"`);
+              await runCommandAsync(`sudo sh -c "echo 'smtp_use_tls = yes' >> ${mainCf}"`);
+
+              // Write passwd credentials file
+              const creds = `[${config.host}]:${config.port} ${config.username}:${config.password}`;
+              const tempPasswd = path.join(os.tmpdir(), 'sasl_passwd_temp');
+              await fs.writeFile(tempPasswd, creds + '\n', 'utf-8');
+              await runCommandAsync(`sudo cp "${tempPasswd}" "${saslPasswd}"`);
+              await fs.unlink(tempPasswd);
+              
+              await runCommandAsync(`sudo chmod 600 ${saslPasswd}`);
+              await runCommandAsync(`sudo postmap ${saslPasswd}`);
+              MOCK_LOGS.push(`[info] SMTP Relay: Active relayhost configured to ${config.host}:${config.port}`);
+            } else {
+              MOCK_LOGS.push(`[info] SMTP Relay: Disabled. Mail will deliver directly from host IP.`);
+            }
+            await runCommandAsync(`sudo systemctl restart postfix`);
+          }
+        } catch (err) {
+          return sendJSON(res, { error: `Failed to configure Postfix relay settings: ${err.message}` }, 500);
+        }
+      } else {
+        MOCK_LOGS.push(`[Mock Mode] SMTP Relay: ${config.enabled ? 'Enabled' : 'Disabled'} relay settings for ${config.host}`);
+      }
+
+      return sendJSON(res, { success: true, config });
+    }
+
     // API SSL Certificates
     if (pathname === '/api/ssl' && req.method === 'GET') {
       const userProfile = users.find(u => u.username === activeUser);
@@ -3491,7 +3632,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const exists = config.ftpUsers.some(u => u.username === body.username);
       if (exists) return sendJSON(res, { error: 'FTP user already exists' }, 400);
 
-      const homePath = body.path || path.join(SANDBOX_DIR, activeUser);
+      const homePath = resolveSandboxPath(body.path, activeUser);
       const password = body.password || 'ftp_password123';
 
       try {

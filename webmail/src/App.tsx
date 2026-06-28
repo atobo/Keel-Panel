@@ -22,6 +22,27 @@ import logoText from './assets/logo-text.png';
 function App() {
   const [token, setToken] = useState(localStorage.getItem('hf_mail_token') || '');
   const [emailAddress, setEmailAddress] = useState(localStorage.getItem('hf_mail_address') || '');
+
+  // Redirect relative API requests to backend port 3001
+  useEffect(() => {
+    const originalFetch = window.fetch;
+    window.fetch = async (input, init: any = {}) => {
+      let url = typeof input === 'string' ? input : (input as any).url || '';
+      if (url.startsWith('/api/')) {
+        const backendPort = '3001';
+        const backendUrl = `${window.location.protocol}//${window.location.hostname}:${backendPort}${url}`;
+        if (typeof input === 'string') {
+          input = backendUrl;
+        } else {
+          (input as any).url = backendUrl;
+        }
+      }
+      return originalFetch(input, init);
+    };
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
   
   // Login Form
   const [loginEmail, setLoginEmail] = useState('');
