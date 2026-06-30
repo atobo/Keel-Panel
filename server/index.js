@@ -422,7 +422,7 @@ async function saveUserCrons(username, cronList) {
   if (isLinux) {
     const cronPath = `/etc/cron.d/keel_${username}`;
     try {
-      const tempPath = path.join(os.tmpdir(), `cron_${username}`);
+      const tempPath = path.join(os.tmpdir(), `cron_${username}_${Date.now()}_${Math.random().toString(36).substring(7)}`);
       await fs.writeFile(tempPath, fileContent, 'utf-8');
       await runCommandAsync(`sudo cp "${tempPath}" "${cronPath}"`);
       await fs.unlink(tempPath);
@@ -559,7 +559,7 @@ async function authorizeSystemSshKey(username, publicKey) {
       await runCommandAsync(`sudo mkdir -p "${sshDir}"`);
       await runCommandAsync(`sudo chmod 700 "${sshDir}"`);
 
-      const tempPath = path.join(os.tmpdir(), `ssh_${username}_key`);
+      const tempPath = path.join(os.tmpdir(), `ssh_${username}_key_${Date.now()}_${Math.random().toString(36).substring(7)}`);
       await fs.writeFile(tempPath, publicKey + '\n', 'utf-8');
       await runCommandAsync(`sudo sh -c 'cat "${tempPath}" >> "${authKeysPath}"'`);
       await fs.unlink(tempPath);
@@ -639,7 +639,7 @@ async function generateVHost(domain, docroot, engine = 'nginx', phpVersion = '8.
         : `/etc/apache2/sites-enabled/${domain}.conf`;
 
       try {
-        const tempPath = path.join(os.tmpdir(), `${domain}.conf`);
+        const tempPath = path.join(os.tmpdir(), `${domain}_${Date.now()}_${Math.random().toString(36).substring(7)}.conf`);
         await fs.writeFile(tempPath, configContent, 'utf-8');
         
         await runCommandAsync(`sudo cp "${tempPath}" "${configPath}"`);
@@ -769,7 +769,7 @@ async function saveBindZone(domainName, dnsRecords) {
   if (isLinux) {
     try {
       await runCommandAsync(`sudo mkdir -p /etc/bind/zones`);
-      const tempPath = path.join(os.tmpdir(), `db.${domainName}`);
+      const tempPath = path.join(os.tmpdir(), `db.${domainName}_${Date.now()}_${Math.random().toString(36).substring(7)}`);
       await fs.writeFile(tempPath, content, 'utf-8');
       await runCommandAsync(`sudo cp "${tempPath}" "/etc/bind/zones/db.${domainName}"`);
       await fs.unlink(tempPath);
@@ -839,7 +839,7 @@ async function updateBindNamedConf(domainName, isDelete = false) {
 
   if (isLinux) {
     try {
-      const tempPath = path.join(os.tmpdir(), 'named.conf.local');
+      const tempPath = path.join(os.tmpdir(), `named.conf.local_${Date.now()}_${Math.random().toString(36).substring(7)}`);
       await fs.writeFile(tempPath, content, 'utf-8');
       await runCommandAsync(`sudo cp "${tempPath}" "${confPath}"`);
       await fs.unlink(tempPath);
@@ -3496,7 +3496,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
               // Write passwd credentials file
               const creds = `[${config.host}]:${config.port} ${config.username}:${config.password}`;
-              const tempPasswd = path.join(os.tmpdir(), 'sasl_passwd_temp');
+              const tempPasswd = path.join(os.tmpdir(), `sasl_passwd_temp_${Date.now()}_${Math.random().toString(36).substring(7)}`);
               await fs.writeFile(tempPasswd, creds + '\n', 'utf-8');
               await runCommandAsync(`sudo cp "${tempPasswd}" "${saslPasswd}"`);
               await fs.unlink(tempPasswd);
@@ -4181,7 +4181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
           }
 
-          const tempSqlFile = path.join(os.tmpdir(), `${activeUser}_db_backup.sql`);
+          const tempSqlFile = path.join(os.tmpdir(), `${activeUser}_db_backup_${Date.now()}_${Math.random().toString(36).substring(7)}.sql`);
           await fs.writeFile(tempSqlFile, dbDumpSql, 'utf-8');
 
           const targetSqlPath = path.join(userDir, 'database_dump.sql');
