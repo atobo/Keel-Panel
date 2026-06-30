@@ -96,6 +96,16 @@ else
   chmod 600 "$DB_PASS_FILE"
 fi
 
+# Set up admin user credential for Keel Panel
+ADMIN_PASS_FILE="/etc/keelpanel/admin.conf"
+if [ -f "$ADMIN_PASS_FILE" ]; then
+  ADMIN_PASSWORD=$(cat "$ADMIN_PASS_FILE")
+else
+  ADMIN_PASSWORD=$(openssl rand -hex 12)
+  echo "$ADMIN_PASSWORD" > "$ADMIN_PASS_FILE"
+  chmod 600 "$ADMIN_PASS_FILE"
+fi
+
 mysql -u root -e "CREATE USER IF NOT EXISTS 'keel_admin'@'localhost' IDENTIFIED BY '${DB_PASS}';"
 mysql -u root -e "ALTER USER 'keel_admin'@'localhost' IDENTIFIED BY '${DB_PASS}';"
 mysql -u root -e "GRANT ALL PRIVILEGES ON *.* TO 'keel_admin'@'localhost' WITH GRANT OPTION;"
@@ -148,7 +158,7 @@ if [ -f "$POSTFIX_MAIN_CF" ]; then
 fi
 
 # DNS SERVER: Bind9
-if service_exists bind9 || service_exists named; then
+if command -v named &> /dev/null; then
   echo -e "DNS Service: \e[1;32mBind9 is already installed.\e[0m"
 else
   echo -e "\e[1;33mInstalling Bind9 local zone server...\e[0m"
@@ -173,13 +183,18 @@ if ! id "keel" &>/dev/null; then
   echo "Created system user: keel"
 fi
 
+# Configure passwordless sudo for the keel user
+echo "keel ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/keel
+chmod 0440 /etc/sudoers.d/keel
+echo "Configured sudoers permissions for keel user"
+
 # Directory boundaries
 mkdir -p /sandbox
 chown root:root /sandbox
 chmod 755 /sandbox
 echo -e "System jail mounted: \e[1;32m/sandbox\e[0m"
 
-# Configure vsftpd for chrooted users if file exists
+# Configure vsftpd for chrooted users and uploads if file exists
 VSFTPD_CONF="/etc/vsftpd.conf"
 if [ -f "$VSFTPD_CONF" ]; then
   # Ensure chroot configurations are active
@@ -189,8 +204,23 @@ if [ -f "$VSFTPD_CONF" ]; then
   if ! grep -q "allow_writeable_chroot=YES" "$VSFTPD_CONF"; then
     echo "allow_writeable_chroot=YES" >> "$VSFTPD_CONF"
   fi
+  
+  # Ensure write_enable is enabled (uncomment if commented out, otherwise append)
+  if grep -q "^#write_enable=YES" "$VSFTPD_CONF"; then
+    sed -i 's/^#write_enable=YES/write_enable=YES/' "$VSFTPD_CONF"
+  elif ! grep -q "^write_enable=YES" "$VSFTPD_CONF"; then
+    echo "write_enable=YES" >> "$VSFTPD_CONF"
+  fi
+
+  # Ensure local_umask is set to 022 for standard file permissions
+  if grep -q "^#local_umask=022" "$VSFTPD_CONF"; then
+    sed -i 's/^#local_umask=022/local_umask=022/' "$VSFTPD_CONF"
+  elif ! grep -q "^local_umask=022" "$VSFTPD_CONF"; then
+    echo "local_umask=022" >> "$VSFTPD_CONF"
+  fi
+
   systemctl restart vsftpd
-  echo -e "FTP boundaries locked in: \e[1;32m$VSFTPD_CONF\e[0m"
+  echo -e "FTP boundaries & write permissions configured in: \e[1;32m$VSFTPD_CONF\e[0m"
 fi
 
 # 6. Install & Configure Keel Panel
@@ -211,8 +241,13 @@ chown -R keel:keel "$INSTALL_DIR"
 chown -R keel:keel /var/log/keelpanel
 
 # Install Node server dependencies
-echo "Installing Node.js packages..."
+echo "Installing Node.js server packages..."
 cd "$INSTALL_DIR/server" && npm install --production
+
+# Install Node client dependencies and build assets
+echo "Installing client packages and compiling frontend..."
+cd "$INSTALL_DIR/client" && npm install && npm run build
+chown -R keel:keel "$INSTALL_DIR/client"
 
 # 7. Create Systemd Service for Daemon
 echo -e "\n\e[1;35m[6/6] Registering Keel Panel Daemon background service...\e[0m"
@@ -225,11 +260,12 @@ After=network.target mysql.service nginx.service vsftpd.service
 
 [Service]
 Type=simple
-User=root
+User=keel
+Group=keel
 WorkingDirectory=$INSTALL_DIR/server
 ExecStart=/usr/bin/node index.js
 Restart=always
-Environment=NODE_ENV=production PORT=3001 DB_HOST=localhost DB_USER=keel_admin DB_PASSWORD=$DB_PASS
+Environment=NODE_ENV=production PORT=3001 DB_HOST=localhost DB_USER=keel_admin DB_PASSWORD=$DB_PASS ADMIN_PASSWORD=$ADMIN_PASSWORD
 
 [Install]
 WantedBy=multi-user.target
@@ -244,5 +280,8 @@ echo -e "\e[1;32m==================================================\e[0m"
 echo -e "\e[1;32m    Keel Panel Installation Completed Successfully! \e[0m"
 echo -e "=================================================="
 echo -e "You can access your Control Panel at: \e[1;34mhttp://localhost:3001/\e[0m"
+echo -e "Default Admin Credentials:"
+echo -e "  * **Username**: admin"
+echo -e "  * **Password**: \e[1;33m${ADMIN_PASSWORD}\e[0m (saved to /etc/keelpanel/admin.conf)"
 echo -e "Daemon logs are stored in systemd journal: \e[1;33mjournalctl -u keelpanel -f\e[0m"
 echo -e "=================================================="

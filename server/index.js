@@ -592,7 +592,7 @@ async function revokeSystemSshKey(username, fingerprint) {
 
 function runCommandAsync(cmd) {
   return new Promise((resolve, reject) => {
-    exec(cmd, (error, stdout, stderr) => {
+    exec(cmd, { cwd: '/' }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
       } else {
