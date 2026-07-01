@@ -3275,6 +3275,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const exists = emails.some(e => e.email === body.email);
       if (exists) return sendJSON(res, { error: 'Email account already exists' }, 400);
       
+      const emailParts = body.email.split('@');
+      const mailboxUser = emailParts[0];
+
+      // Provision local Linux system user for Postfix mail routing
+      const isLinux = process.platform === 'linux';
+      if (isLinux) {
+        try {
+          await runCommandAsync(`sudo useradd -m -s /usr/sbin/nologin ${mailboxUser}`);
+          if (body.password) {
+            await runCommandAsync(`echo "${mailboxUser}:${body.password}" | sudo chpasswd`);
+          }
+          console.log(`[info] Provisioned Linux mail user: ${mailboxUser}`);
+        } catch (err) {
+          console.error(`Failed to provision Linux system user for email ${body.email}:`, err.message);
+        }
+      }
+
       const newEmail = {
         email: body.email,
         quota: body.quota || '500 MB',
@@ -3291,6 +3308,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (pathname === '/api/emails/delete' && req.method === 'POST') {
       const body = await parseBody(req);
+      
+      const emailParts = body.email.split('@');
+      const mailboxUser = emailParts[0];
+
+      // Delete the corresponding local Linux system user
+      const isLinux = process.platform === 'linux';
+      if (isLinux) {
+        try {
+          await runCommandAsync(`sudo userdel -r ${mailboxUser}`);
+          console.log(`[info] Deleted Linux mail user: ${mailboxUser}`);
+        } catch (err) {
+          console.error(`Failed to delete Linux system user for email ${body.email}:`, err.message);
+        }
+      }
+
       emails = emails.filter(e => e.email !== body.email);
       await saveEmailsConfig({ emails, emailForwarders, autoresponders, spamFilter });
       
@@ -3379,9 +3411,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       return sendJSON(res, { success: true, spamFilter });
     }
 
-    // Webmail Simulation
+    // Webmail Real messages + Simulation
     if (pathname === '/api/emails/webmail/messages' && req.method === 'GET') {
-      return sendJSON(res, { messages: webmailMessages });
+      const messagesList = [...webmailMessages];
+      
+      const isLinux = process.platform === 'linux';
+      if (isLinux) {
+        // Read real local mbox files for all mailboxes
+        for (const account of emails) {
+          const mailboxUser = account.email.split('@')[0];
+          const mboxPath = `/var/mail/${mailboxUser}`;
+          try {
+            if (existsSync(mboxPath)) {
+              const content = await fs.readFile(mboxPath, 'utf-8');
+              // Simple mbox parser
+              const parts = content.split(/\nFrom\s/);
+              for (let i = 0; i < parts.length; i++) {
+                let part = parts[i];
+                if (i === 0 && part.startsWith('From ')) {
+                  part = part.substring(5);
+                }
+                if (!part.trim()) continue;
+                
+                const splitIndex = part.indexOf('\n\n');
+                const headerSection = splitIndex !== -1 ? part.substring(0, splitIndex) : part;
+                const bodySection = splitIndex !== -1 ? part.substring(splitIndex + 2) : '';
+                
+                const headers = {};
+                const headerLines = headerSection.split('\n');
+                let lastKey = null;
+                for (const line of headerLines) {
+                  if (line.startsWith(' ') || line.startsWith('\t')) {
+                    if (lastKey) {
+                      headers[lastKey] += ' ' + line.trim();
+                    }
+                  } else {
+                    const colonIndex = line.indexOf(':');
+                    if (colonIndex !== -1) {
+                      const key = line.substring(0, colonIndex).trim().toLowerCase();
+                      const value = line.substring(colonIndex + 1).trim();
+                      headers[key] = value;
+                      lastKey = key;
+                    }
+                  }
+                }
+                
+                let formattedDate = new Date().toISOString().replace('T', ' ').substring(0, 16);
+                if (headers['date']) {
+                  try {
+                    formattedDate = new Date(headers['date']).toISOString().replace('T', ' ').substring(0, 16);
+                  } catch (e) {}
+                }
+                
+                messagesList.push({
+                  id: `real_${mailboxUser}_${i}`,
+                  from: headers['from'] || 'unknown',
+                  to: headers['to'] || account.email,
+                  subject: headers['subject'] || '(No Subject)',
+                  body: bodySection.trim(),
+                  date: formattedDate,
+                  read: false,
+                  direction: 'inbox'
+                });
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to read/parse local mailbox for ${mailboxUser}:`, err.message);
+          }
+        }
+      }
+      
+      return sendJSON(res, { messages: messagesList });
     }
 
     // Webmail Groups API
