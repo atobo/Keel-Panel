@@ -2763,7 +2763,10 @@ function App() {
               letterSpacing: '2px',
               fontFamily: 'Syncopate, sans-serif',
               fontWeight: 800,
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              background: 'var(--accent-gradient)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
             }}>Keel Panel</span>
           </div>
           <p className="login-subtitle">Sign in to manage your server environment</p>
