@@ -21,6 +21,9 @@ Before starting, verify your system specs using the commands below:
 6.  **System Permissions**: Sudo/root access (required for virtual host generation, folder bounding, and port bindings)
     *   *Check command*: `sudo -v` (will prompt for password to verify access)
 
+> [!NOTE]
+> **Residential & Home Network Deployments**: If you are installing on a home/consumer connection, ISPs often block ports `80`, `443` (inbound), and `25` (outbound). See [Part 4: ISP Port Blocking & Residential Workarounds](documentation.md#part-4-isp-port-blocking--residential-workarounds) for instructions on using Cloudflare Tunnels and SMTP relays to bypass these blocks.
+
 ### 🔧 Installing/Updating Missing Requirements
 
 If your system is missing any of the dependencies, use the commands below to install them:

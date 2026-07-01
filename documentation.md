@@ -8,6 +8,7 @@ This document is the ultimate reference manual for **Keel Panel**, providing det
 1. [Part 1: Administrator Installation & Hardening Guide](#part-1-administrator-installation--hardening-guide)
 2. [Part 2: Administrator Operations Manual](#part-2-administrator-operations-manual)
 3. [Part 3: Tenant / End-User User Manual](#part-3-tenant--end-user-user-manual)
+4. [Part 4: ISP Port Blocking & Residential Workarounds](#part-4-isp-port-blocking--residential-workarounds)
 
 ---
 
@@ -208,3 +209,96 @@ End-user controls to run websites, files, and databases.
 *   Navigate to **Cloud-Native Integrations**.
 *   **Cloud Backups**: Configure Amazon S3, Google Cloud Storage, or Backblaze B2 bucket credentials. Click **Trigger Backup** to stream compressed directory archives directly to your cloud buckets.
 *   **DNS Provider API**: Enter Cloudflare, Route53, or DigitalOcean API keys. Click **Sync to Cloud** next to your domains to push zone records to external registrars instantly.
+
+---
+
+## 🌐 Part 4: ISP Port Blocking & Residential Workarounds
+
+When deploying Keel Panel on a home server or residential/consumer internet connection, internet service providers (ISPs) often block:
+- **Inbound Ports**: `80` (HTTP) and `443` (HTTPS) to prevent hosting web servers on consumer tiers.
+- **Outbound Port**: `25` (SMTP) globally to curb outbound spam and email abuse.
+
+To deploy Keel Panel successfully in these environments, use the following bypass strategies:
+
+### 1. Inbound Bypass: Cloudflare Tunnels
+
+A Cloudflare Tunnel connects your local server ports directly to the Cloudflare network without requiring any open inbound ports or dynamic DNS.
+
+#### Step 1: Install `cloudflared`
+Download and install the Cloudflare Tunnel daemon on your server:
+```bash
+# Add Cloudflare gpg key
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null
+
+# Add cloudflared repository
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+
+# Install cloudflared
+sudo apt-get update && sudo apt-get install cloudflared -y
+```
+
+#### Step 2: Authenticate and Create Tunnel
+1. Run the login command and click the URL provided to authorize with your Cloudflare account:
+   ```bash
+   cloudflared tunnel login
+   ```
+2. Create your tunnel (replace `my-vps-tunnel` with a custom name):
+   ```bash
+   cloudflared tunnel create my-vps-tunnel
+   ```
+   *This generates a JSON credentials file in `~/.cloudflare/`.*
+
+#### Step 3: Configure Routing
+Create or edit your local configuration file (usually `~/.cloudflare/config.yml`):
+```yaml
+tunnel: <TUNNEL_UUID>
+credentials-file: /home/keel/.cloudflare/<TUNNEL_UUID>.json
+
+ingress:
+  - hostname: panel.yourdomain.com
+    service: http://localhost:3001
+  - hostname: mail.yourdomain.com
+    service: http://localhost:3002
+  - service: http_status:404
+```
+Ensure you create the DNS records in Cloudflare pointing to your tunnel:
+```bash
+cloudflared tunnel route dns my-vps-tunnel panel.yourdomain.com
+cloudflared tunnel route dns my-vps-tunnel mail.yourdomain.com
+```
+
+#### Step 4: Run as a Service
+Install the tunnel as a system service so it launches on boot:
+```bash
+sudo cloudflared --config /home/keel/.cloudflare/config.yml service install
+sudo systemctl start cloudflared
+sudo systemctl enable cloudflared
+```
+
+---
+
+### 2. Outbound Bypass: Amazon SES SMTP Relay
+
+To bypass outbound Port 25 blocking and ensure high deliverability, configure Keel Panel to route outbound mail through Amazon SES (or another SMTP relay service like MailerSend, SendGrid, etc.).
+
+#### Step 1: Obtain SMTP Credentials from Amazon SES
+1. Log in to your **Amazon AWS Console** and navigate to **Amazon Simple Email Service (SES)**.
+2. Verify your domain or email address in **Verified Identities**.
+3. Go to **SMTP Settings** in the AWS SES sidebar.
+4. Click **Create SMTP Credentials**. Download or copy the generated Username and Password.
+5. Note your SES SMTP endpoint and port (e.g., `email-smtp.us-east-1.amazonaws.com` on Port `587` or `465`).
+
+#### Step 2: Enable SMTP Relay in Keel Panel
+1. Access the Keel Panel dashboard UI.
+2. Navigate to **Mail Services** -> **SMTP Relay Settings**.
+3. Toggle **Enable Outbound SMTP Relay** to **ON**.
+4. Enter the details:
+   - **SMTP Host**: e.g., `email-smtp.us-east-1.amazonaws.com`
+   - **Port**: `587`
+   - **Username**: *Your generated AWS SES SMTP username*
+   - **Password / API Key**: *Your generated AWS SES SMTP password*
+5. Click **Save Settings**. 
+
+Keel Panel will automatically update the Postfix `main.cf` configurations, rebuild the SASL maps database, and reload Postfix. All outbound mail will now route through Amazon SES over secure port 587/465.
+

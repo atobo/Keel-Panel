@@ -230,6 +230,12 @@ function App() {
   const [isWebmailComposeOpen, setIsWebmailComposeOpen] = useState(false);
   const [selectedWebmailMsg, setSelectedWebmailMsg] = useState<any>(null);
   
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [changeCurrentPassword, setChangeCurrentPassword] = useState('');
+  const [changeNewPassword, setChangeNewPassword] = useState('');
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+
   // Dashboard System States
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -2099,6 +2105,40 @@ function App() {
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!changeCurrentPassword || !changeNewPassword || !changeConfirmPassword) {
+      addToast('All fields are required', 'error');
+      return;
+    }
+    if (changeNewPassword !== changeConfirmPassword) {
+      addToast('New passwords do not match', 'error');
+      return;
+    }
+    setChangePasswordLoading(true);
+    try {
+      const res = await fetch('/api/profile/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: changeCurrentPassword, newPassword: changeNewPassword })
+      });
+      const data = await res.json();
+      if (data.success) {
+        addToast('Password updated successfully!', 'success');
+        setIsChangePasswordOpen(false);
+        setChangeCurrentPassword('');
+        setChangeNewPassword('');
+        setChangeConfirmPassword('');
+      } else {
+        addToast(data.error || 'Failed to change password', 'error');
+      }
+    } catch (err) {
+      addToast('Error changing password', 'error');
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
   const handleChmod = async () => {
     if (!chmodPath || !chmodMode) return;
     try {
@@ -2923,9 +2963,12 @@ function App() {
             <button className="btn-icon" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <div className="user-profile">
+             <div className="user-profile">
               <div className="user-avatar" style={{ textTransform: 'uppercase' }}>{username ? username[0] : 'U'}</div>
               <span style={{ marginRight: '8px', textTransform: 'capitalize' }}>{username || 'User'} ({role || 'Guest'})</span>
+              <button className="btn btn-secondary btn-small" style={{ marginRight: '8px' }} onClick={() => setIsChangePasswordOpen(true)}>
+                Change Password
+              </button>
               <button className="btn btn-secondary btn-small" onClick={handleLogout}>
                 Logout
               </button>
@@ -7699,6 +7742,60 @@ function App() {
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setIsNewAlertModalOpen(false)}>Cancel</button>
               <button type="submit" className="btn btn-primary">Create Alert</button>
+            </div>
+          </form>
+        </div>
+      )}
+      {/* MODAL: CHANGE PASSWORD */}
+      {isChangePasswordOpen && (
+        <div className="modal-overlay">
+          <form className="modal-content" onSubmit={handleChangePassword} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title font-semibold">Change Profile Password</h3>
+              <button type="button" className="btn-icon" style={{ border: 'none' }} onClick={() => setIsChangePasswordOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Current Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  placeholder="Enter current password"
+                  value={changeCurrentPassword}
+                  onChange={e => setChangeCurrentPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">New Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  placeholder="Enter new password"
+                  value={changeNewPassword}
+                  onChange={e => setChangeNewPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ marginBottom: '16px' }}>
+                <label className="form-label">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  className="form-input" 
+                  placeholder="Confirm new password"
+                  value={changeConfirmPassword}
+                  onChange={e => setChangeConfirmPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setIsChangePasswordOpen(false)}>Cancel</button>
+              <button type="submit" className="btn btn-primary" disabled={changePasswordLoading}>
+                {changePasswordLoading ? 'Updating...' : 'Update Password'}
+              </button>
             </div>
           </form>
         </div>

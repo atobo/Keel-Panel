@@ -1,7 +1,7 @@
 import http from 'http';
 import { WebSocketServer } from 'ws';
 import fs from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
@@ -1024,12 +1024,41 @@ let dbData = IS_DEMO ? {
 let protectedDirectories = {};
 
 // Authentication configurations & User database
-let users = IS_DEMO ? [
-  { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' },
-  { username: 'tenant1', password: process.env.TENANT_PASSWORD || 'password', role: 'tenant', quota: '5 GB', created: '2026-06-25' }
-] : [
-  { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' }
-];
+const USERS_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'users_config.json');
+
+if (!existsSync(USERS_CONFIG_FILE)) {
+  const initialConfig = IS_DEMO ? [
+    { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' },
+    { username: 'tenant1', password: process.env.TENANT_PASSWORD || 'password', role: 'tenant', quota: '5 GB', created: '2026-06-25' }
+  ] : [
+    { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' }
+  ];
+  try {
+    writeFileSync(USERS_CONFIG_FILE, JSON.stringify(initialConfig, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to initialize users config file:', err);
+  }
+}
+
+let users = [];
+try {
+  const content = readFileSync(USERS_CONFIG_FILE, 'utf-8');
+  users = JSON.parse(content);
+} catch (err) {
+  console.error('Failed to load users config from file, using environment variable fallback:', err);
+  users = [
+    { username: 'admin', password: process.env.ADMIN_PASSWORD || 'password', role: 'admin', quota: 'Unlimited', created: '2026-06-25' }
+  ];
+}
+
+async function saveUsersConfig(usersList) {
+  try {
+    await fs.writeFile(USERS_CONFIG_FILE, JSON.stringify(usersList, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save users config:', err);
+  }
+}
+
 let activeSessions = new Map(); // token -> username
 
 // Web Server and Domains State
@@ -1703,6 +1732,25 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, { error: 'Invalid username or password' }, 401);
     }
 
+    // API Profile Change Password
+    if (pathname === '/api/profile/change-password' && req.method === 'POST') {
+      const user = isAuthenticated(req);
+      if (!user) return sendJSON(res, { error: 'Unauthorized' }, 401);
+
+      const body = await parseBody(req);
+      const { currentPassword, newPassword } = body;
+      
+      const userObj = users.find(u => u.username === user);
+      if (!userObj || userObj.password !== currentPassword) {
+        return sendJSON(res, { error: 'Invalid current password' }, 400);
+      }
+
+      userObj.password = newPassword;
+      await saveUsersConfig(users);
+      MOCK_LOGS.push(`[info] User ${user} updated password successfully`);
+      return sendJSON(res, { success: true });
+    }
+
     // Require authentication for all other /api/ paths
     let activeUser = null;
     let effectiveUser = null;
@@ -2337,6 +2385,7 @@ const server = http.createServer(async (req, res) => {
         MOCK_LOGS.push(`[info] Uploaded file: ${fileName} to folder: ${folderPath}`);
         return sendJSON(res, { success: true });
       } catch (err) {
+        console.error('[Error] File upload failed:', err);
         return sendJSON(res, { error: `Upload failed: ${err.message}` }, 500);
       }
     }
