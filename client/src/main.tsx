@@ -1991,6 +1991,7 @@ function App() {
     } else if (activeTab === 'emails') {
       fetchEmailData();
       fetchWebmailMessages();
+      fetchDomains();
     } else if (activeTab === 'crons') {
       fetchCrons();
       fetchCronLogs();
