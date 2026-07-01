@@ -3521,7 +3521,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           const mboxPath = `/var/mail/${mailboxUser}`;
           try {
             if (existsSync(mboxPath)) {
-              const content = await fs.readFile(mboxPath, 'utf-8');
+              let content = await fs.readFile(mboxPath, 'utf-8');
+              content = content.replace(/\r\n/g, '\n');
               // Simple mbox parser
               const parts = content.split(/\nFrom\s/);
               for (let i = 0; i < parts.length; i++) {
