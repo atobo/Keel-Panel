@@ -3438,6 +3438,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         direction: 'sent'
       };
       webmailMessages.push(newMsg);
+
+      // Dispatch the real email using the system's sendmail binary
+      try {
+        const { spawn } = require('child_process');
+        const sendmail = spawn('sendmail', ['-f', body.from, body.to]);
+        
+        // Build raw email message headers and body
+        let rawEmail = `From: ${body.from}\n`;
+        rawEmail += `To: ${body.to}\n`;
+        if (body.cc) rawEmail += `Cc: ${body.cc}\n`;
+        rawEmail += `Subject: ${body.subject}\n`;
+        rawEmail += `MIME-Version: 1.0\n`;
+        rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+        rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
+        rawEmail += body.body;
+
+        sendmail.stdin.write(rawEmail);
+        sendmail.stdin.end();
+
+        sendmail.on('error', (err) => {
+          console.error(`[Error] Failed to spawn sendmail process: ${err.message}`);
+        });
+      } catch (err) {
+        console.error(`[Error] Error sending email via sendmail: ${err.message}`);
+      }
       
       // Auto-reply simulation if an autoresponder is configured for the "To" address
       const responder = autoresponders.find(a => a.email === body.to && a.enabled);
