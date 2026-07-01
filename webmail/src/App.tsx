@@ -165,6 +165,17 @@ function App() {
     }
   }, [token, emailAddress]);
 
+  useEffect(() => {
+    if (isComposeOpen) {
+      setTimeout(() => {
+        const editor = document.getElementById('webmail-editor');
+        if (editor) {
+          editor.innerHTML = composeBody || '';
+        }
+      }, 50);
+    }
+  }, [isComposeOpen]);
+
   const fetchContacts = async () => {
     try {
       const res = await fetch('/api/emails/webmail/contacts', {
@@ -1286,7 +1297,6 @@ function App() {
                     color: '#f8fafc',
                     padding: '12px'
                   }}
-                  dangerouslySetInnerHTML={{ __html: composeBody || '' }}
                 />
               </div>
               <div className="form-group">
