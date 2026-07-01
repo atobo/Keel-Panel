@@ -1041,8 +1041,23 @@ let webServer = {
 };
 
 let domains = [];
+async function syncPostfixDomains() {
+  const isLinux = process.platform === 'linux';
+  if (!isLinux) return;
+  try {
+    const list = ['\\$myhostname', 'localhost.\\$mydomain', 'localhost', ...domains.map(d => d.name)];
+    const mydest = list.join(', ');
+    await runCommandAsync(`sudo postconf -e "mydestination = ${mydest}"`);
+    await runCommandAsync('sudo systemctl reload postfix');
+    console.log(`[info] Postfix mydestination updated to: ${mydest}`);
+  } catch (err) {
+    console.error('Failed to sync domains to Postfix mydestination:', err);
+  }
+}
+
 async function loadDomainsData() {
   domains = await loadDomainsConfig();
+  await syncPostfixDomains();
 }
 loadDomainsData();
 
@@ -3120,6 +3135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       };
       domains.push(newDomain);
       await saveDomainsConfig(domains);
+      await syncPostfixDomains();
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
@@ -3149,6 +3165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       domains = domains.filter(d => d.name !== body.name);
       await saveDomainsConfig(domains);
+      await syncPostfixDomains();
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
