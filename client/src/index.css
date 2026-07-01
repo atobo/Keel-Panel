@@ -103,8 +103,9 @@ body {
   display: inline-block;
   font-size: 1.3rem;
   font-weight: 700;
-  background: var(--accent-gradient);
+  background-image: var(--accent-gradient);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
@@ -706,8 +707,9 @@ body {
   display: inline-block;
   font-size: 1.6rem;
   font-weight: 700;
-  background: var(--accent-gradient);
+  background-image: var(--accent-gradient);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: -0.5px;
 }
