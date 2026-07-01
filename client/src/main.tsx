@@ -2812,7 +2812,7 @@ function App() {
       <div className="sidebar">
         <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '16px 20px' }}>
           <img src={logoIcon} style={{ width: '28px', height: '28px', borderRadius: '6px' }} alt="Keel Icon" />
-          <span className="logo-text" style={{ fontWeight: 800, background: 'linear-gradient(135deg, #fff 0%, #a5b4fc 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Keel Panel</span>
+          <span className="logo-text" style={{ fontWeight: 800, background: 'var(--accent-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Keel Panel</span>
         </div>
         <div className="sidebar-nav">
           {(role === 'admin' || role === 'tenant' || role === 'developer' || role === 'dba') && (

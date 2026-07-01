@@ -34,6 +34,7 @@ server/emails_config.json
 server/ftp_ssh_config.json
 server/dx_config.json
 server/mail_relay_config.json
+server/users_config.json
 server/ssl/
 
 # Production builds and build outputs

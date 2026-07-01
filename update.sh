@@ -20,9 +20,19 @@ git pull
 
 echo -e "\e[1;35m[2/4] Deploying source code to $INSTALL_DIR...\e[0m"
 # Copy updated source code (preserving existing json configs)
+# 1. Back up existing server configs if they exist
+mkdir -p /tmp/keel-configs/
+cp "$INSTALL_DIR/server/"*.json /tmp/keel-configs/ 2>/dev/null
+
+# 2. Copy source directories
 cp -r ./client "$INSTALL_DIR/"
 cp -r ./server "$INSTALL_DIR/"
 cp -r ./webmail "$INSTALL_DIR/"
+
+# 3. Restore server configs
+cp /tmp/keel-configs/*.json "$INSTALL_DIR/server/" 2>/dev/null
+rm -rf /tmp/keel-configs/
+
 chown -R keel:keel "$INSTALL_DIR"
 
 echo -e "\e[1;35m[3/4] Installing dependencies & rebuilding packages...\e[0m"
