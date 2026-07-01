@@ -1043,7 +1043,7 @@ let webServer = {
 let domains = [];
 async function syncPostfixDomains() {
   const isLinux = process.platform === 'linux';
-  if (!isLinux) return;
+  if (!isLinux || IS_DEMO) return;
   try {
     const list = ['\\$myhostname', 'localhost.\\$mydomain', 'localhost', ...domains.map(d => d.name)];
     const mydest = list.join(', ');
@@ -3280,7 +3280,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // Provision local Linux system user for Postfix mail routing
       const isLinux = process.platform === 'linux';
-      if (isLinux) {
+      if (isLinux && !IS_DEMO) {
         try {
           await runCommandAsync(`sudo useradd -m -s /usr/sbin/nologin ${mailboxUser}`);
           if (body.password) {
@@ -3314,7 +3314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // Delete the corresponding local Linux system user
       const isLinux = process.platform === 'linux';
-      if (isLinux) {
+      if (isLinux && !IS_DEMO) {
         try {
           await runCommandAsync(`sudo userdel -r ${mailboxUser}`);
           console.log(`[info] Deleted Linux mail user: ${mailboxUser}`);
@@ -3416,7 +3416,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       const messagesList = [...webmailMessages];
       
       const isLinux = process.platform === 'linux';
-      if (isLinux) {
+      if (isLinux && !IS_DEMO) {
         // Read real local mbox files for all mailboxes
         for (const account of emails) {
           const mailboxUser = account.email.split('@')[0];
@@ -3597,28 +3597,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       };
       webmailMessages.push(newMsg);
 
-      // Dispatch the real email using the system's sendmail binary
-      try {
-        const sendmail = spawn('sendmail', ['-f', body.from, body.to]);
-        
-        // Build raw email message headers and body
-        let rawEmail = `From: ${body.from}\n`;
-        rawEmail += `To: ${body.to}\n`;
-        if (body.cc) rawEmail += `Cc: ${body.cc}\n`;
-        rawEmail += `Subject: ${body.subject}\n`;
-        rawEmail += `MIME-Version: 1.0\n`;
-        rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
-        rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
-        rawEmail += body.body;
+      // Dispatch the real email using the system's sendmail binary if not in demo mode
+      const isLinux = process.platform === 'linux';
+      if (isLinux && !IS_DEMO) {
+        try {
+          const sendmail = spawn('sendmail', ['-f', body.from, body.to]);
+          
+          // Build raw email message headers and body
+          let rawEmail = `From: ${body.from}\n`;
+          rawEmail += `To: ${body.to}\n`;
+          if (body.cc) rawEmail += `Cc: ${body.cc}\n`;
+          rawEmail += `Subject: ${body.subject}\n`;
+          rawEmail += `MIME-Version: 1.0\n`;
+          rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+          rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
+          rawEmail += body.body;
 
-        sendmail.stdin.write(rawEmail);
-        sendmail.stdin.end();
+          sendmail.stdin.write(rawEmail);
+          sendmail.stdin.end();
 
-        sendmail.on('error', (err) => {
-          console.error(`[Error] Failed to spawn sendmail process: ${err.message}`);
-        });
-      } catch (err) {
-        console.error(`[Error] Error sending email via sendmail: ${err.message}`);
+          sendmail.on('error', (err) => {
+            console.error(`[Error] Failed to spawn sendmail process: ${err.message}`);
+          });
+        } catch (err) {
+          console.error(`[Error] Error sending email via sendmail: ${err.message}`);
+        }
       }
       
       // Auto-reply simulation if an autoresponder is configured for the "To" address
