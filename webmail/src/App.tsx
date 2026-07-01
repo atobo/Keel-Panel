@@ -511,8 +511,9 @@ function App() {
   const filteredMessages = messages.filter(msg => {
     // 1. Folder filter
     const isSent = msg.from.toLowerCase() === emailAddress.toLowerCase();
+    const isToMe = msg.to.toLowerCase() === emailAddress.toLowerCase();
     if (activeFolder === 'sent' && !isSent) return false;
-    if (activeFolder === 'inbox' && isSent) return false;
+    if (activeFolder === 'inbox' && isSent && !isToMe) return false;
     if (activeFolder === 'spam' && activeFolder !== msg.folder) return false; // simulated folders
     
     // 2. Search query filter
