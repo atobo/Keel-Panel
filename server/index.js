@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
 import zlib from 'zlib';
 import { getNginxTemplate, getApacheTemplate, getNginxWebmailTemplate, getApacheWebmailTemplate } from './vhostTemplates.js';
-import { exec } from 'child_process';
+import { exec, spawn } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -3482,7 +3482,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // Dispatch the real email using the system's sendmail binary
       try {
-        const { spawn } = require('child_process');
         const sendmail = spawn('sendmail', ['-f', body.from, body.to]);
         
         // Build raw email message headers and body
