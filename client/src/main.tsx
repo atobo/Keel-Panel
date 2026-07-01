@@ -2938,7 +2938,7 @@ function App() {
           )}
         </div>
         <div className="sidebar-footer">
-          <span>v1.0.0 (Demo Mode)</span>
+          <span>v1.0.0</span>
         </div>
       </div>
 
