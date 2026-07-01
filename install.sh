@@ -249,6 +249,11 @@ echo "Installing client packages and compiling frontend..."
 cd "$INSTALL_DIR/client" && npm install && npm run build
 chown -R keel:keel "$INSTALL_DIR/client"
 
+# Install Node webmail dependencies and build assets
+echo "Installing webmail packages and compiling webmail client..."
+cd "$INSTALL_DIR/webmail" && npm install && npm run build
+chown -R keel:keel "$INSTALL_DIR/webmail"
+
 # 7. Create Systemd Service for Daemon
 echo -e "\n\e[1;35m[6/6] Registering Keel Panel Daemon background service...\e[0m"
 
