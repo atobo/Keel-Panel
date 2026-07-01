@@ -217,6 +217,68 @@ async function loadEmailsConfig() {
   }
 }
 
+const DOMAINS_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'domains_config.json');
+
+async function initDomainsConfig() {
+  if (!existsSync(DOMAINS_CONFIG_FILE)) {
+    const initialConfig = IS_DEMO ? [
+      {
+        name: 'keel-wp.test',
+        docroot: '/sandbox',
+        engine: 'nginx',
+        phpVersion: '8.2',
+        status: 'enabled',
+        owner: 'tenant1',
+        redirectUrl: null,
+        dnsRecords: [
+          { type: 'A', name: '@', value: '127.0.0.1', ttl: 3600 },
+          { type: 'CNAME', name: 'www', value: '@', ttl: 3600 },
+          { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 },
+          { type: 'MX', name: '@', value: '10 mail.keel-wp.test', ttl: 3600 }
+        ]
+      },
+      {
+        name: 'production-app.test',
+        docroot: '/sandbox/assets',
+        engine: 'nginx',
+        phpVersion: '8.3',
+        status: 'enabled',
+        owner: 'tenant1',
+        redirectUrl: null,
+        dnsRecords: [
+          { type: 'A', name: '@', value: '127.0.0.1', ttl: 3600 },
+          { type: 'CNAME', name: 'www', value: '@', ttl: 3600 },
+          { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 }
+        ]
+      }
+    ] : [];
+    try {
+      await fs.writeFile(DOMAINS_CONFIG_FILE, JSON.stringify(initialConfig, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to initialize Domains config file:', err);
+    }
+  }
+}
+initDomainsConfig();
+
+async function saveDomainsConfig(domainsList) {
+  try {
+    await fs.writeFile(DOMAINS_CONFIG_FILE, JSON.stringify(domainsList, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save domains config:', err);
+  }
+}
+
+async function loadDomainsConfig() {
+  try {
+    const content = await fs.readFile(DOMAINS_CONFIG_FILE, 'utf-8');
+    return JSON.parse(content);
+  } catch (err) {
+    console.error('Failed to load domains config:', err);
+    return [];
+  }
+}
+
 // Mail Relay SMTP Configurations File
 const MAIL_RELAY_CONFIG_FILE = path.join(WORKSPACE_ROOT, 'server', 'mail_relay_config.json');
 
@@ -978,37 +1040,11 @@ let webServer = {
   uptime: 86400 * 4 + 3600 * 2 // 4 days, 2 hours
 };
 
-let domains = IS_DEMO ? [
-  {
-    name: 'keel-wp.test',
-    docroot: '/sandbox',
-    engine: 'nginx',
-    phpVersion: '8.2',
-    status: 'enabled',
-    owner: 'tenant1',
-    redirectUrl: null,
-    dnsRecords: [
-      { type: 'A', name: '@', value: '127.0.0.1', ttl: 3600 },
-      { type: 'CNAME', name: 'www', value: '@', ttl: 3600 },
-      { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 },
-      { type: 'MX', name: '@', value: '10 mail.keel-wp.test', ttl: 3600 }
-    ]
-  },
-  {
-    name: 'production-app.test',
-    docroot: '/sandbox/assets',
-    engine: 'nginx',
-    phpVersion: '8.3',
-    status: 'enabled',
-    owner: 'tenant1',
-    redirectUrl: null,
-    dnsRecords: [
-      { type: 'A', name: '@', value: '127.0.0.1', ttl: 3600 },
-      { type: 'CNAME', name: 'www', value: '@', ttl: 3600 },
-      { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 }
-    ]
-  }
-] : [];
+let domains = [];
+async function loadDomainsData() {
+  domains = await loadDomainsConfig();
+}
+loadDomainsData();
 
 // Mock states for new modules
 let emails = [];
@@ -3083,6 +3119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         dnsRecords: defaultDnsRecords
       };
       domains.push(newDomain);
+      await saveDomainsConfig(domains);
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
@@ -3111,6 +3148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
 
       domains = domains.filter(d => d.name !== body.name);
+      await saveDomainsConfig(domains);
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
@@ -3141,6 +3179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       } catch (err) {
         console.error(`Failed to sync zone records to Bind9 for ${domain.name}:`, err.message);
       }
+      await saveDomainsConfig(domains);
 
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
@@ -3163,6 +3202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         return sendJSON(res, { error: `Failed to configure redirection: ${err.message}` }, 500);
       }
 
+      await saveDomainsConfig(domains);
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
@@ -3192,6 +3232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           return sendJSON(res, { error: `Failed to toggle virtual host status: ${err.message}` }, 500);
         }
       }
+      await saveDomainsConfig(domains);
       const userProfile = users.find(u => u.username === activeUser);
       const userDomains = userProfile?.role === 'admin' ? domains : domains.filter(d => d.owner === activeUser);
       return sendJSON(res, { success: true, domains: userDomains });
