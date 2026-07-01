@@ -468,7 +468,8 @@ function App() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!composeTo.trim() || !composeSubject.trim() || !composeBody.trim()) {
+    const editorHtml = document.getElementById('webmail-editor')?.innerHTML || '';
+    if (!composeTo.trim() || !composeSubject.trim() || !editorHtml.trim() || editorHtml === '<br>') {
       alert('All fields are required');
       return;
     }
@@ -486,7 +487,7 @@ function App() {
           cc: composeCc.trim(),
           bcc: composeBcc.trim(),
           subject: composeSubject.trim(),
-          body: composeBody,
+          body: editorHtml,
           attachments: composeAttachments
         })
       });
@@ -879,7 +880,11 @@ function App() {
               </div>
             </div>
             <div className="message-body">
-              <div style={{ whiteSpace: 'pre-wrap' }}>{selectedMessage.body}</div>
+              {/<[a-z][\s\S]*>/i.test(selectedMessage.body) ? (
+                <div dangerouslySetInnerHTML={{ __html: selectedMessage.body }} />
+              ) : (
+                <div style={{ whiteSpace: 'pre-wrap' }}>{selectedMessage.body}</div>
+              )}
               
               {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
                 <div className="message-attachments" style={{ marginTop: '24px', borderTop: '1px solid #334155', paddingTop: '16px' }}>
@@ -1170,13 +1175,119 @@ function App() {
               </div>
               <div className="form-group">
                 <label>Message Content</label>
-                <textarea 
-                  className="form-textarea" 
-                  placeholder="Write your message here..." 
-                  value={composeBody}
-                  onChange={e => setComposeBody(e.target.value)}
-                  rows={10}
-                  required
+                <div className="wysiwyg-toolbar" style={{
+                  display: 'flex',
+                  gap: '6px',
+                  background: '#1e293b',
+                  border: '1px solid #334155',
+                  borderBottom: 'none',
+                  borderRadius: '6px 6px 0 0',
+                  padding: '6px 12px',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <button 
+                    type="button" 
+                    title="Bold"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', fontWeight: 'bold', cursor: 'pointer', padding: '4px 8px' }}
+                    onClick={() => document.execCommand('bold', false)}
+                  >
+                    B
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Italic"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', fontStyle: 'italic', cursor: 'pointer', padding: '4px 8px' }}
+                    onClick={() => document.execCommand('italic', false)}
+                  >
+                    I
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Underline"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', textDecoration: 'underline', cursor: 'pointer', padding: '4px 8px' }}
+                    onClick={() => document.execCommand('underline', false)}
+                  >
+                    U
+                  </button>
+                  
+                  <span style={{ borderLeft: '1px solid #475569', height: '16px', margin: '0 4px' }} />
+                  
+                  <select 
+                    title="Font Size"
+                    style={{ background: '#0f172a', border: '1px solid #475569', color: '#f8fafc', borderRadius: '4px', fontSize: '12px', padding: '2px 4px' }}
+                    onChange={(e) => document.execCommand('fontSize', false, e.target.value)}
+                  >
+                    <option value="3">Normal</option>
+                    <option value="1">Small</option>
+                    <option value="4">Medium</option>
+                    <option value="5">Large</option>
+                    <option value="6">Extra Large</option>
+                  </select>
+                  
+                  <span style={{ borderLeft: '1px solid #475569', height: '16px', margin: '0 4px' }} />
+                  
+                  <button 
+                    type="button" 
+                    title="Align Left"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => document.execCommand('justifyLeft', false)}
+                  >
+                    ⬅
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Align Center"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => document.execCommand('justifyCenter', false)}
+                  >
+                    ↔
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Align Right"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => document.execCommand('justifyRight', false)}
+                  >
+                    ➡
+                  </button>
+                  
+                  <span style={{ borderLeft: '1px solid #475569', height: '16px', margin: '0 4px' }} />
+                  
+                  <button 
+                    type="button" 
+                    title="Bulleted List"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => document.execCommand('insertUnorderedList', false)}
+                  >
+                    • List
+                  </button>
+                  <button 
+                    type="button" 
+                    title="Numbered List"
+                    style={{ background: 'none', border: 'none', color: '#f8fafc', cursor: 'pointer', padding: '4px' }}
+                    onClick={() => document.execCommand('insertOrderedList', false)}
+                  >
+                    1. List
+                  </button>
+                </div>
+                
+                <div 
+                  id="webmail-editor"
+                  className="wysiwyg-editor form-textarea"
+                  contentEditable={true}
+                  placeholder="Write your message here..."
+                  style={{
+                    border: '1px solid #334155',
+                    borderRadius: '0 0 6px 6px',
+                    minHeight: '200px',
+                    maxHeight: '400px',
+                    overflowY: 'auto',
+                    background: '#0f172a',
+                    color: '#f8fafc',
+                    padding: '12px'
+                  }}
+                  dangerouslySetInnerHTML={{ __html: composeBody || '' }}
                 />
               </div>
               <div className="form-group">

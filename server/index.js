@@ -3717,13 +3717,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           rawEmail += `Subject: ${body.subject}\n`;
           rawEmail += `MIME-Version: 1.0\n`;
           
+          const hasHtml = /<[a-z][\s\S]*>/i.test(body.body);
+          const textContentType = hasHtml ? 'text/html' : 'text/plain';
+          
           if (body.attachments && body.attachments.length > 0) {
             const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(7)}`;
             rawEmail += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
             
             // Text part
             rawEmail += `--${boundary}\n`;
-            rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+            rawEmail += `Content-Type: ${textContentType}; charset=utf-8\n`;
             rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
             rawEmail += `${body.body}\n\n`;
             
@@ -3743,7 +3746,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             rawEmail += `--${boundary}--`;
           } else {
-            rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+            rawEmail += `Content-Type: ${textContentType}; charset=utf-8\n`;
             rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
             rawEmail += body.body;
           }
