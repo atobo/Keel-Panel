@@ -6,9 +6,9 @@
   --border-color: #2e3c64;
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --accent-blue: #3b82f6;
-  --accent-purple: #8b5cf6;
-  --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --accent-blue: #10b981;
+  --accent-purple: #06b6d4;
+  --accent-gradient: linear-gradient(135deg, #34d399 0%, #10b981 50%, #06b6d4 100%);
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
