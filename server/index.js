@@ -10,8 +10,29 @@ import zlib from 'zlib';
 import { getNginxTemplate, getApacheTemplate, getNginxWebmailTemplate, getApacheWebmailTemplate } from './vhostTemplates.js';
 import { exec, spawn } from 'child_process';
 
+import { SESv2Client, CreateEmailIdentityCommand } from "@aws-sdk/client-sesv2";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize AWS SESv2 Client if credentials exist
+const AWS_SES_REGION = process.env.AWS_REGION || 'us-east-1';
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || '';
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || '';
+
+let sesClient = null;
+if (AWS_ACCESS_KEY_ID && AWS_SECRET_ACCESS_KEY) {
+  sesClient = new SESv2Client({
+    region: AWS_SES_REGION,
+    credentials: {
+      accessKeyId: AWS_ACCESS_KEY_ID,
+      secretAccessKey: AWS_SECRET_ACCESS_KEY
+    }
+  });
+  console.log(`[AWS SES] Initialized client in region ${AWS_SES_REGION}`);
+} else {
+  console.log('[AWS SES] Client not initialized (missing AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY)');
+}
 
 // Database connection configuration
 const DB_CONFIG = {
@@ -3261,6 +3282,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         { type: 'CNAME', name: 'www', value: '@', ttl: 3600 },
         { type: 'A', name: 'webmail', value: '127.0.0.1', ttl: 3600 }
       ];
+
+      // Auto-register domain with AWS SES if client is configured
+      if (sesClient) {
+        try {
+          console.log(`[AWS SES] Requesting registration for identity: ${body.name}`);
+          const command = new CreateEmailIdentityCommand({ EmailIdentity: body.name });
+          const response = await sesClient.send(command);
+          if (response.DkimAttributes && response.DkimAttributes.Tokens) {
+            const tokens = response.DkimAttributes.Tokens;
+            console.log(`[AWS SES] Retrieved ${tokens.length} DKIM tokens for domain: ${body.name}`);
+            tokens.forEach(token => {
+              defaultDnsRecords.push({
+                type: 'CNAME',
+                name: `${token}._domainkey`,
+                value: `${token}.dkim.amazonses.com.`,
+                ttl: 3600
+              });
+            });
+            MOCK_LOGS.push(`[info] Automated Amazon SES DKIM records generated for: ${body.name}`);
+          }
+        } catch (awsErr) {
+          console.error(`[AWS SES] Auto-registration failed for ${body.name}:`, awsErr.message);
+          MOCK_LOGS.push(`[warning] Automated Amazon SES registration failed: ${awsErr.message}`);
+        }
+      }
 
       try {
         await saveBindZone(body.name, defaultDnsRecords);
