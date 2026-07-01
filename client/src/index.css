@@ -100,6 +100,7 @@ body {
 }
 
 .logo-text {
+  display: inline-block;
   font-size: 1.3rem;
   font-weight: 700;
   background: var(--accent-gradient);
@@ -702,6 +703,7 @@ body {
 }
 
 .login-title {
+  display: inline-block;
   font-size: 1.6rem;
   font-weight: 700;
   background: var(--accent-gradient);
