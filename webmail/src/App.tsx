@@ -1276,7 +1276,6 @@ function App() {
                   id="webmail-editor"
                   className="wysiwyg-editor form-textarea"
                   contentEditable={true}
-                  placeholder="Write your message here..."
                   style={{
                     border: '1px solid #334155',
                     borderRadius: '0 0 6px 6px',
