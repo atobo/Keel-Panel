@@ -1040,6 +1040,104 @@ let webServer = {
   uptime: 86400 * 4 + 3600 * 2 // 4 days, 2 hours
 };
 
+function decodeQuotedPrintable(str) {
+  return str
+    .replace(/=\r?\n/g, '')
+    .replace(/=([0-9A-F]{2})/gi, (match, hex) => {
+      return String.fromCharCode(parseInt(hex, 16));
+    });
+}
+
+function parseMimeBody(body, contentType) {
+  const result = {
+    body: body,
+    attachments: []
+  };
+  
+  if (!contentType) return result;
+  
+  const multipartMatch = contentType.match(/boundary=["']?([^"';\s]+)["']?/i);
+  if (multipartMatch) {
+    const boundary = multipartMatch[1];
+    const parts = body.split('--' + boundary);
+    
+    let textPart = '';
+    let htmlPart = '';
+    
+    for (const part of parts) {
+      if (part.trim() === '--' || !part.trim()) continue;
+      
+      const splitIndex = part.indexOf('\n\n');
+      const headerSection = splitIndex !== -1 ? part.substring(0, splitIndex) : part;
+      let bodySection = splitIndex !== -1 ? part.substring(splitIndex + 2) : '';
+      
+      // Parse part headers
+      const partHeaders = {};
+      const lines = headerSection.split('\n');
+      for (const line of lines) {
+        const colonIndex = line.indexOf(':');
+        if (colonIndex !== -1) {
+          partHeaders[line.substring(0, colonIndex).trim().toLowerCase()] = line.substring(colonIndex + 1).trim();
+        }
+      }
+      
+      const partContentType = partHeaders['content-type'] || '';
+      const partDisposition = partHeaders['content-disposition'] || '';
+      
+      const isAttachment = partDisposition.includes('attachment') || 
+                           (partContentType && !partContentType.includes('text/plain') && !partContentType.includes('text/html'));
+      
+      if (isAttachment) {
+        // Extract filename from disposition or content-type
+        let filename = 'attachment';
+        const fileMatch1 = partDisposition.match(/filename=["']?([^"';]+)["']?/i);
+        const fileMatch2 = partContentType.match(/name=["']?([^"';]+)["']?/i);
+        if (fileMatch1) {
+          filename = fileMatch1[1];
+        } else if (fileMatch2) {
+          filename = fileMatch2[1];
+        }
+        
+        // Extract content type
+        const rawType = partContentType.split(';')[0].trim();
+        
+        // The bodySection contains raw base64 data for attachment
+        const cleanBase64 = bodySection.replace(/\s/g, '');
+        const dataUrl = `data:${rawType};base64,${cleanBase64}`;
+        
+        result.attachments.push({
+          filename,
+          contentType: rawType,
+          url: dataUrl
+        });
+      } else {
+        const encoding = (partHeaders['content-transfer-encoding'] || '').toLowerCase();
+        if (encoding.includes('quoted-printable')) {
+          bodySection = decodeQuotedPrintable(bodySection);
+        }
+        
+        if (partContentType.includes('text/plain')) {
+          textPart = bodySection.trim();
+        } else if (partContentType.includes('text/html')) {
+          htmlPart = bodySection.trim();
+        }
+      }
+    }
+    
+    if (textPart) {
+      result.body = textPart;
+    } else if (htmlPart) {
+      result.body = htmlPart
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/p>/gi, '\n\n')
+        .replace(/<[^>]*>/g, '')
+        .trim();
+    }
+  }
+  
+  return result;
+}
+
 let domains = [];
 async function syncPostfixDomains() {
   const isLinux = process.platform === 'linux';
@@ -3463,12 +3561,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   } catch (e) {}
                 }
                 
+                let finalBody = bodySection.trim();
+                const mainEncoding = (headers['content-transfer-encoding'] || '').toLowerCase();
+                if (mainEncoding.includes('quoted-printable')) {
+                  finalBody = decodeQuotedPrintable(finalBody);
+                }
+                const mimeResult = parseMimeBody(finalBody, headers['content-type']);
+
                 messagesList.push({
                   id: `real_${mailboxUser}_${i}`,
                   from: headers['from'] || 'unknown',
                   to: headers['to'] || account.email,
                   subject: headers['subject'] || '(No Subject)',
-                  body: bodySection.trim(),
+                  body: mimeResult.body,
+                  attachments: mimeResult.attachments,
                   date: formattedDate,
                   read: false,
                   direction: 'inbox'
@@ -3609,9 +3715,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           if (body.cc) rawEmail += `Cc: ${body.cc}\n`;
           rawEmail += `Subject: ${body.subject}\n`;
           rawEmail += `MIME-Version: 1.0\n`;
-          rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
-          rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
-          rawEmail += body.body;
+          
+          if (body.attachments && body.attachments.length > 0) {
+            const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+            rawEmail += `Content-Type: multipart/mixed; boundary="${boundary}"\n\n`;
+            
+            // Text part
+            rawEmail += `--${boundary}\n`;
+            rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+            rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
+            rawEmail += `${body.body}\n\n`;
+            
+            // Attachments
+            for (const att of body.attachments) {
+              rawEmail += `--${boundary}\n`;
+              rawEmail += `Content-Type: ${att.contentType}; name="${att.filename}"\n`;
+              rawEmail += `Content-Transfer-Encoding: base64\n`;
+              rawEmail += `Content-Disposition: attachment; filename="${att.filename}"\n\n`;
+              
+              // Clean data URL prefix if present
+              const base64Data = att.content.replace(/^data:.*?;base64,/, '');
+              // Split base64 into 76-character lines
+              const matches = base64Data.match(/.{1,76}/g);
+              const formattedBase64 = matches ? matches.join('\n') : base64Data;
+              rawEmail += `${formattedBase64}\n\n`;
+            }
+            rawEmail += `--${boundary}--`;
+          } else {
+            rawEmail += `Content-Type: text/plain; charset=utf-8\n`;
+            rawEmail += `Content-Transfer-Encoding: 8bit\n\n`;
+            rawEmail += body.body;
+          }
 
           sendmail.stdin.write(rawEmail);
           sendmail.stdin.end();

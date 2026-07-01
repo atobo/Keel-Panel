@@ -63,6 +63,7 @@ function App() {
   const [composeBcc, setComposeBcc] = useState('');
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
+  const [composeAttachments, setComposeAttachments] = useState<{ filename: string, content: string, contentType: string }[]>([]);
   const [sending, setSending] = useState(false);
 
   // Address Book & Mailing List state
@@ -485,7 +486,8 @@ function App() {
           cc: composeCc.trim(),
           bcc: composeBcc.trim(),
           subject: composeSubject.trim(),
-          body: composeBody
+          body: composeBody,
+          attachments: composeAttachments
         })
       });
       const data = await res.json();
@@ -496,6 +498,7 @@ function App() {
         setComposeBcc('');
         setComposeSubject('');
         setComposeBody('');
+        setComposeAttachments([]);
         fetchMessages();
       } else {
         alert(data.error || 'Failed to send message');
@@ -876,7 +879,49 @@ function App() {
               </div>
             </div>
             <div className="message-body">
-              {selectedMessage.body}
+              <div style={{ whiteSpace: 'pre-wrap' }}>{selectedMessage.body}</div>
+              
+              {selectedMessage.attachments && selectedMessage.attachments.length > 0 && (
+                <div className="message-attachments" style={{ marginTop: '24px', borderTop: '1px solid #334155', paddingTop: '16px' }}>
+                  <h4 style={{ marginBottom: '12px', fontSize: '14px', color: '#94a3b8' }}>
+                    Attachments ({selectedMessage.attachments.length})
+                  </h4>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    {selectedMessage.attachments.map((att: any, idx: number) => (
+                      <a 
+                        key={idx} 
+                        href={att.url} 
+                        download={att.filename}
+                        className="attachment-download-link"
+                        style={{
+                          background: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          padding: '10px 16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: '#f8fafc',
+                          textDecoration: 'none',
+                          fontSize: '13px',
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = '#14b8a6';
+                          e.currentTarget.style.background = '#0f172a';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = '#334155';
+                          e.currentTarget.style.background = '#1e293b';
+                        }}
+                      >
+                        <span style={{ fontWeight: 500 }}>{att.filename}</span>
+                        <span style={{ fontSize: '11px', color: '#94a3b8' }}>Download</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1133,6 +1178,57 @@ function App() {
                   rows={10}
                   required
                 />
+              </div>
+              <div className="form-group">
+                <label>Attachments</label>
+                <input 
+                  type="file" 
+                  multiple 
+                  className="form-input" 
+                  onChange={async (e) => {
+                    const files = e.target.files;
+                    if (!files) return;
+                    
+                    const newAtts = [...composeAttachments];
+                    for (let i = 0; i < files.length; i++) {
+                      const file = files[i];
+                      const reader = new FileReader();
+                      
+                      const readFile = () => new Promise<string>((resolve) => {
+                        reader.onload = () => resolve(reader.result as string);
+                        reader.readAsDataURL(file);
+                      });
+                      
+                      const dataUrl = await readFile();
+                      newAtts.push({
+                        filename: file.name,
+                        contentType: file.type || 'application/octet-stream',
+                        content: dataUrl
+                      });
+                    }
+                    setComposeAttachments(newAtts);
+                    // Reset value so the same file can be selected again if removed
+                    e.target.value = '';
+                  }}
+                />
+                {composeAttachments.length > 0 && (
+                  <div className="compose-attachments-list" style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {composeAttachments.map((att, idx) => (
+                      <div key={idx} className="attachment-chip" style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '16px', padding: '4px 12px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{att.filename}</span>
+                        <button 
+                          type="button" 
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '0 4px', fontWeight: 'bold' }}
+                          onClick={() => {
+                            setComposeAttachments(composeAttachments.filter((_, itemIdx) => itemIdx !== idx));
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="modal-footer">
